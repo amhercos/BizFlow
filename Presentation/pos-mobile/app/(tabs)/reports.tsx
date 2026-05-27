@@ -1,5 +1,5 @@
 import { CalendarDays, Filter, RefreshCcw, Search } from "lucide-react-native";
-import { Skeleton } from "moti/skeleton"; // Added for skeletons
+import { Skeleton } from "moti/skeleton";
 import React, {
   memo,
   ReactElement,

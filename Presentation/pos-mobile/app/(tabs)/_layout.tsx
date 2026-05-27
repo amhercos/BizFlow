@@ -51,14 +51,14 @@ export default function TabLayout(): React.JSX.Element {
       headerTitleStyle: styles.headerTitle,
       headerLeft: () => <DrawerTrigger />,
       tabBarActiveTintColor: "#2563eb",
-      tabBarInactiveTintColor: "#0f172a", // Black font for inactive symbols
+      tabBarInactiveTintColor: "#0f172a",
       tabBarLabelStyle: styles.tabLabel,
-      tabBarBackground: () => <TabBarCurve />, // Applied the curve design
+      tabBarBackground: () => <TabBarCurve />,
       tabBarStyle: {
         height: 75,
         paddingBottom: Platform.OS === "ios" ? 25 : 10,
         borderTopWidth: 0,
-        backgroundColor: "transparent", // Background handled by TabBarCurve
+        backgroundColor: "transparent",
         elevation: 0,
         paddingHorizontal: isTablet ? width * 0.15 : 0,
       },

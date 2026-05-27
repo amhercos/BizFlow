@@ -1,4 +1,3 @@
-// src/components/sales/TransactionContent.tsx
 import { type CustomerCredit } from "@/src/types/credit";
 import { PaymentType, type BasketItem } from "@/src/types/sale";
 import { CheckCircle2, RotateCcw, X } from "lucide-react-native";
