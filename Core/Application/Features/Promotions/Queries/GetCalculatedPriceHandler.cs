@@ -16,10 +16,17 @@ public class GetCalculatedPriceHandler(
 
         if (product == null) return 0;
 
+        var transactionBasket = request.Basket?
+            .Select(item => new TransactionItem
+            {
+                ProductId = item.ProductId,
+                Quantity = item.Quantity
+            }) ?? Enumerable.Empty<TransactionItem>();
+
         return promotionEngine.CalculateLineTotal(
-            product,
-            request.Quantity,
-            Enumerable.Empty<TransactionItem>()
-        );
+             product,
+             request.Quantity,
+             transactionBasket
+         );
     }
 }
