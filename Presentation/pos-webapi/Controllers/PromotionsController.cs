@@ -18,9 +18,9 @@ public class PromotionsController : ControllerBase
     public async Task<IActionResult> GetAll(CancellationToken ct)
         => Ok(await _mediator.Send(new GetPromotionsQuery(), ct));
 
-    [HttpGet("calculate")]
-    public async Task<IActionResult> CalculatePrice([FromQuery] Guid productId, [FromQuery] int quantity, CancellationToken ct)
-        => Ok(await _mediator.Send(new GetCalculatedPriceQuery(productId, quantity), ct));
+    [HttpPost("calculate")]
+    public async Task<IActionResult> CalculatePrice([FromBody] GetCalculatedPriceQuery query, CancellationToken ct)
+     => Ok(await _mediator.Send(query, ct));
 
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] CreatePromotionCommand command, CancellationToken ct)

@@ -24,7 +24,7 @@ export function calculateLineTotal(
     };
   }
 
-  // locate the running active campaign
+  // Locate the running active campaign
   const promo = item.promotions.find((p) => p.isActive === true);
   if (!promo || !promo.tiers || promo.tiers.length === 0) {
     return {
@@ -59,24 +59,52 @@ export function calculateLineTotal(
     const sortedTiers = [...promo.tiers].sort(
       (a, b) => a.quantity - b.quantity,
     );
-    const bundleTier: PromotionTier | undefined = sortedTiers[0];
-    const bundlePrice = bundleTier ? bundleTier.price : item.unitPrice;
+    const bundleTier = sortedTiers[0];
 
     const tieUpItem = fullBasket.find(
       (i) => i.productId === promo.tieUpProductId,
     );
     const tieUpInCart = tieUpItem ? tieUpItem.quantity : 0;
 
-    const applicableBundleCount = Math.min(item.quantity, tieUpInCart);
-    const regularPriceCount = item.quantity - applicableBundleCount;
+    const mainRequiredQty = bundleTier ? bundleTier.quantity : 1;
+    const tieUpRequiredQty = promo.tieUpQuantity || 1;
 
-    const discountedTotal =
-      applicableBundleCount * bundlePrice + regularPriceCount * item.unitPrice;
+    const possibleBundlesByMain = Math.floor(item.quantity / mainRequiredQty);
+    const possibleBundlesByTieUp = Math.floor(tieUpInCart / tieUpRequiredQty);
+    const applicableBundleCount = Math.min(
+      possibleBundlesByMain,
+      possibleBundlesByTieUp,
+    );
+
+    if (applicableBundleCount > 0 && bundleTier) {
+      const tieUpUnitPrice = tieUpItem ? tieUpItem.unitPrice : 0;
+
+      const standardMainBundleCost = mainRequiredQty * item.unitPrice;
+      const standardTieUpBundleCost = tieUpRequiredQty * tieUpUnitPrice;
+      const totalStandardCostForCombo =
+        standardMainBundleCost + standardTieUpBundleCost;
+
+      const packageDealSavings = Math.max(
+        0,
+        totalStandardCostForCombo - bundleTier.price,
+      );
+      const totalSavingsForLine = packageDealSavings * applicableBundleCount;
+
+      const discountedTotal = Math.max(0, originalTotal - totalSavingsForLine);
+
+      return {
+        discountedTotal,
+        originalTotal,
+        savings: totalSavingsForLine,
+        appliedPromotionName: promo.name,
+      };
+    }
+
     return {
-      discountedTotal,
+      discountedTotal: originalTotal,
       originalTotal,
-      savings: Math.max(0, originalTotal - discountedTotal),
-      appliedPromotionName: applicableBundleCount > 0 ? promo.name : null,
+      savings: 0,
+      appliedPromotionName: null,
     };
   }
 
@@ -86,7 +114,7 @@ export function calculateLineTotal(
     let remainingQuantity = item.quantity;
 
     const sortedTiers = [...promo.tiers].sort(
-      (b, a) => a.quantity - b.quantity,
+      (a, b) => b.quantity - a.quantity,
     );
 
     for (const tier of sortedTiers) {

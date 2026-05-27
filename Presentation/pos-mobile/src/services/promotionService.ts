@@ -29,6 +29,7 @@ export const promotionService = {
     await apiClient.put(`/Promotions/${data.mainProductId}`, data);
     showToast.success("Updated", "Promotion has been updated");
   },
+
   toggle: async (id: string): Promise<void> => {
     await apiClient.patch(`/Promotions/${id}/toggle`);
   },
@@ -41,15 +42,17 @@ export const promotionService = {
   calculate: async (
     params: PromotionCalculationRequest,
   ): Promise<PromotionCalculationResponse> => {
-    const response = await apiClient.get<PromotionCalculationResponse>(
+    const response = await apiClient.post<PromotionCalculationResponse>(
       "/Promotions/calculate",
       {
-        params: {
-          productId: params.productId,
-          quantity: params.quantity,
-          // Note: If you want to send the whole basket, the backend needs to change to POST
-          // or handle complex query strings. For now, matching your current GET:
-        },
+        productId: params.productId,
+        quantity: params.quantity,
+        basket:
+          params.basket?.map((item) => ({
+            productId: item.productId,
+            quantity: item.quantity,
+            unitPrice: 0,
+          })) || [],
       },
     );
     return response.data;
