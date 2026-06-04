@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "Bizflow",
-    "slug": "Bizflow",
+    "slug": "pos-mobile",
     "version": "1.0.0",
     "orientation": "default",
     "icon": "./assets/images/icon.png",
