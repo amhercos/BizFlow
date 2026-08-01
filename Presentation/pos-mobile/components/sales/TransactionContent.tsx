@@ -237,6 +237,7 @@ export const TransactionContent = memo<TransactionContentProps>(
               <BillDetails
                 calcResult={dynamicCalcResult}
                 isCalculating={false}
+                amountTendered={!isCredit ? cashReceived : 0}
               />
             </ScrollView>
           </View>
