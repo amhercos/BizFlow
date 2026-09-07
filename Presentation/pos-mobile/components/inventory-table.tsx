@@ -164,6 +164,14 @@ export function InventoryTable({
                     <Text className="text-[14px] font-black text-slate-900">
                       ₱{Math.round(product.price).toLocaleString()}
                     </Text>
+                    {product.packPrice != null &&
+                    product.packPrice > 0 &&
+                    product.piecesPerPack != null &&
+                    product.piecesPerPack > 1 ? (
+                      <Text className="text-[9px] font-bold text-slate-400">
+                        {product.piecesPerPack}pk
+                      </Text>
+                    ) : null}
                   </View>
                   <View className="w-[50px] items-end">
                     <Text
@@ -301,7 +309,16 @@ export function ProductCard({
           </Text>
           <Text className="text-3xl font-black text-slate-900">
             ₱{product.price.toLocaleString()}
+            <Text className="text-sm font-bold text-slate-400"> /pc</Text>
           </Text>
+          {product.packPrice != null &&
+          product.packPrice > 0 &&
+          product.piecesPerPack != null &&
+          product.piecesPerPack > 1 ? (
+            <Text className="text-[12px] font-bold text-slate-400 mt-1">
+              ₱{product.packPrice.toLocaleString()} / {product.piecesPerPack}pk
+            </Text>
+          ) : null}
         </View>
         <TouchableOpacity
           onPress={() => onEdit(product)}

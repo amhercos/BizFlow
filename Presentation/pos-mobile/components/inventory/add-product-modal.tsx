@@ -1,6 +1,10 @@
 import { cn } from "@/src/lib/utils";
 import type { Category, CreateProductRequest } from "@/src/types/inventory";
 import {
+  isPackConfigValid,
+  parseOptionalNumber,
+} from "@/src/types/inventory";
+import {
   Calendar,
   Check,
   FileText,
@@ -48,6 +52,8 @@ export function AddProductModal({
   const [formData, setFormData] = useState({
     name: "",
     price: "",
+    packPrice: "",
+    piecesPerPack: "",
     stockQuantity: "",
     categoryId: null as string | null,
     description: "",
@@ -102,6 +108,8 @@ export function AddProductModal({
       await onAdd({
         ...formData,
         price: Number(formData.price),
+        packPrice: parseOptionalNumber(formData.packPrice),
+        piecesPerPack: parseOptionalNumber(formData.piecesPerPack),
         stockQuantity: Number(formData.stockQuantity),
         categoryId: formData.categoryId,
         expiryDate: formData.expiryDate || null,
@@ -109,6 +117,8 @@ export function AddProductModal({
       setFormData({
         name: "",
         price: "",
+        packPrice: "",
+        piecesPerPack: "",
         stockQuantity: "",
         categoryId: null,
         description: "",
@@ -127,7 +137,8 @@ export function AddProductModal({
     () =>
       formData.name.trim().length >= 2 &&
       formData.price !== "" &&
-      formData.stockQuantity !== "",
+      formData.stockQuantity !== "" &&
+      isPackConfigValid(formData.packPrice, formData.piecesPerPack),
     [formData],
   );
 
@@ -259,7 +270,7 @@ export function AddProductModal({
 
               <View className="flex-row gap-4">
                 <View className="flex-1">
-                  <Text className={labelClass}>Price (₱)</Text>
+                  <Text className={labelClass}>Piece Price (₱)</Text>
                   <TextInput
                     keyboardType="numeric"
                     placeholder="0.00"
@@ -271,7 +282,7 @@ export function AddProductModal({
                   />
                 </View>
                 <View className="flex-1">
-                  <Text className={labelClass}>Stock</Text>
+                  <Text className={labelClass}>Stock (pcs)</Text>
                   <TextInput
                     keyboardType="numeric"
                     placeholder="Qty"
@@ -282,6 +293,38 @@ export function AddProductModal({
                     }
                   />
                 </View>
+              </View>
+
+              <View>
+                <Text className={labelClass}>Pack selling (optional)</Text>
+                <View className="flex-row gap-4">
+                  <View className="flex-1">
+                    <TextInput
+                      keyboardType="numeric"
+                      placeholder="Pack price"
+                      className={inputClass}
+                      value={formData.packPrice}
+                      onChangeText={(val) =>
+                        setFormData({ ...formData, packPrice: val })
+                      }
+                    />
+                  </View>
+                  <View className="flex-1">
+                    <TextInput
+                      keyboardType="numeric"
+                      placeholder="Pcs / pack"
+                      className={inputClass}
+                      value={formData.piecesPerPack}
+                      onChangeText={(val) =>
+                        setFormData({ ...formData, piecesPerPack: val })
+                      }
+                    />
+                  </View>
+                </View>
+                <Text className="text-[10px] font-semibold text-slate-400 mt-2 ml-1">
+                  Fill both to sell this item by pack. Leave blank for piece
+                  only.
+                </Text>
               </View>
 
               <View>

@@ -5,6 +5,10 @@ import type {
   UpdateProductRequest,
 } from "@/src/types/inventory";
 import {
+  isPackConfigValid,
+  parseOptionalNumber,
+} from "@/src/types/inventory";
+import {
   Calendar,
   Check,
   FileText,
@@ -54,6 +58,8 @@ export function EditProductModal({
   const [formData, setFormData] = useState({
     name: "",
     price: "",
+    packPrice: "",
+    piecesPerPack: "",
     stockQuantity: "",
     categoryId: null as string | null,
     description: "",
@@ -92,6 +98,14 @@ export function EditProductModal({
       setFormData({
         name: product.name,
         price: product.price.toString(),
+        packPrice:
+          product.packPrice != null && product.packPrice > 0
+            ? String(product.packPrice)
+            : "",
+        piecesPerPack:
+          product.piecesPerPack != null && product.piecesPerPack > 1
+            ? String(product.piecesPerPack)
+            : "",
         stockQuantity: product.stockQuantity.toString(),
         categoryId: product.categoryId || null,
         description: product.description || "",
@@ -115,7 +129,8 @@ export function EditProductModal({
     () =>
       formData.name.trim().length >= 2 &&
       formData.price !== "" &&
-      formData.stockQuantity !== "",
+      formData.stockQuantity !== "" &&
+      isPackConfigValid(formData.packPrice, formData.piecesPerPack),
     [formData],
   );
 
@@ -133,6 +148,8 @@ export function EditProductModal({
         id: product.id,
         name: formData.name,
         price: Number(formData.price),
+        packPrice: parseOptionalNumber(formData.packPrice),
+        piecesPerPack: parseOptionalNumber(formData.piecesPerPack),
         stock: Number(formData.stockQuantity),
         lowStockThreshold: product.lowStockThreshold || 5,
         categoryId: formData.categoryId,
@@ -281,10 +298,10 @@ export function EditProductModal({
                 )}
               </View>
 
-              {/* Price & Stock */}
+              {/* Price, stock, and optional pack */}
               <View className="flex-row gap-4">
                 <View className="flex-1">
-                  <Text className={labelClass}>Price (₱)</Text>
+                  <Text className={labelClass}>Piece Price (₱)</Text>
                   <TextInput
                     keyboardType="numeric"
                     placeholder="0.00"
@@ -296,7 +313,7 @@ export function EditProductModal({
                   />
                 </View>
                 <View className="flex-1">
-                  <Text className={labelClass}>Stock</Text>
+                  <Text className={labelClass}>Stock (pcs)</Text>
                   <TextInput
                     keyboardType="numeric"
                     placeholder="Qty"
@@ -307,6 +324,38 @@ export function EditProductModal({
                     }
                   />
                 </View>
+              </View>
+
+              <View>
+                <Text className={labelClass}>Pack selling (optional)</Text>
+                <View className="flex-row gap-4">
+                  <View className="flex-1">
+                    <TextInput
+                      keyboardType="numeric"
+                      placeholder="Pack price"
+                      className={inputClass}
+                      value={formData.packPrice}
+                      onChangeText={(val) =>
+                        setFormData({ ...formData, packPrice: val })
+                      }
+                    />
+                  </View>
+                  <View className="flex-1">
+                    <TextInput
+                      keyboardType="numeric"
+                      placeholder="Pcs / pack"
+                      className={inputClass}
+                      value={formData.piecesPerPack}
+                      onChangeText={(val) =>
+                        setFormData({ ...formData, piecesPerPack: val })
+                      }
+                    />
+                  </View>
+                </View>
+                <Text className="text-[10px] font-semibold text-slate-400 mt-2 ml-1">
+                  Fill both to sell this item by pack. Leave blank for piece
+                  only.
+                </Text>
               </View>
 
               {/* Expiry Date */}

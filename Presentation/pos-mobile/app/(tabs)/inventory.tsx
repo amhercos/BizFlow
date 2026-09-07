@@ -470,9 +470,20 @@ function InventoryGridCard({
       className="bg-white border border-slate-100 rounded-[32px] p-5 mb-4 shadow-sm overflow-hidden"
     >
       <View className="flex-row justify-between items-center mb-3">
-        <Text className="text-xl font-black text-slate-900 tracking-tight">
-          ₱{product.price.toLocaleString()}
-        </Text>
+        <View>
+          <Text className="text-xl font-black text-slate-900 tracking-tight">
+            ₱{product.price.toLocaleString()}
+            <Text className="text-[11px] font-bold text-slate-400"> /pc</Text>
+          </Text>
+          {product.packPrice != null &&
+          product.packPrice > 0 &&
+          product.piecesPerPack != null &&
+          product.piecesPerPack > 1 ? (
+            <Text className="text-[11px] font-bold text-slate-400 mt-0.5">
+              ₱{product.packPrice.toLocaleString()}/{product.piecesPerPack}pk
+            </Text>
+          ) : null}
+        </View>
         <View
           className={cn(
             "w-2.5 h-2.5 rounded-full",
