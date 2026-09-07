@@ -1,19 +1,25 @@
+import { typeface, useInter } from "@/src/theme/typography";
 import type { CustomerCredit } from "@/src/types/credit";
-import { UserCog, X } from "lucide-react-native";
+import { X } from "lucide-react-native";
 import React, { useEffect, useState } from "react";
 import {
-    ActivityIndicator,
-    Keyboard,
-    KeyboardAvoidingView,
-    Modal,
-    Platform,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    TouchableWithoutFeedback,
-    View,
+  ActivityIndicator,
+  Keyboard,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  TouchableWithoutFeedback,
+  View,
 } from "react-native";
+
+const INK = "#0F172A";
+const MUTED = "#64748B";
+const TINT = "#2563EB";
 
 interface EditCreditModalProps {
   credit: CustomerCredit | null;
@@ -28,6 +34,7 @@ export function EditCreditModal({
   onClose,
   onConfirm,
 }: EditCreditModalProps) {
+  const font = useInter();
   const [name, setName] = useState("");
   const [contact, setContact] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -52,6 +59,8 @@ export function EditCreditModal({
     }
   };
 
+  const canSubmit = !isSubmitting && name.trim().length > 0;
+
   return (
     <Modal
       visible={isOpen}
@@ -61,76 +70,64 @@ export function EditCreditModal({
     >
       <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
         <View style={styles.overlay}>
+          <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
           <KeyboardAvoidingView
             behavior={Platform.OS === "ios" ? "padding" : "height"}
             style={styles.container}
           >
-            <View className="bg-white rounded-[32px] p-8 w-full shadow-2xl relative">
-              {/* Close Button */}
-              <TouchableOpacity
-                onPress={onClose}
-                className="absolute right-6 top-6 p-2 z-10"
-              >
-                <X size={20} color="#94a3b8" />
-              </TouchableOpacity>
-
-              {/* Header */}
-              <View className="items-center mb-8">
-                <View className="h-14 w-14 items-center justify-center rounded-2xl bg-blue-50 mb-4">
-                  <UserCog size={28} color="#2563eb" />
+            <View style={styles.card}>
+              <View style={styles.header}>
+                <View style={styles.identity}>
+                  <Text style={[styles.title, typeface(font.bold, "700")]}>
+                    Customer details
+                  </Text>
+                  <Text style={[styles.subtitle, typeface(font.medium, "500")]}>
+                    Name and contact
+                  </Text>
                 </View>
-                <Text className="text-xl font-bold text-slate-900">
-                  Customer Details
-                </Text>
+                <TouchableOpacity
+                  onPress={onClose}
+                  style={styles.close}
+                  accessibilityLabel="Close customer details"
+                >
+                  <X size={18} color={INK} />
+                </TouchableOpacity>
               </View>
 
-              {/* Form */}
-              <View className="space-y-5">
-                <View>
-                  <Text className="text-[11px] font-bold uppercase tracking-wider text-slate-400 ml-1 mb-2">
-                    Full Name
-                  </Text>
-                  <TextInput
-                    className="h-12 rounded-2xl border border-slate-100 bg-slate-50/50 px-4 text-[14px] text-slate-900 focus:bg-white"
-                    placeholder="Enter customer name"
-                    value={name}
-                    onChangeText={setName}
-                  />
-                </View>
+              <Text style={[styles.label, typeface(font.medium, "500")]}>
+                Full name
+              </Text>
+              <TextInput
+                style={[styles.input, typeface(font.medium, "500")]}
+                placeholder="Enter customer name"
+                placeholderTextColor="#94A3B8"
+                value={name}
+                onChangeText={setName}
+              />
 
-                <View>
-                  <Text className="text-[11px] font-bold uppercase tracking-wider text-slate-400 ml-1 mb-2">
-                    Contact Information
-                  </Text>
-                  <TextInput
-                    className="h-12 rounded-2xl border border-slate-100 bg-slate-50/50 px-4 text-[14px] text-slate-900 focus:bg-white"
-                    placeholder="Phone or Email"
-                    value={contact}
-                    onChangeText={setContact}
-                    keyboardType="default"
-                  />
-                </View>
-              </View>
+              <Text style={[styles.label, typeface(font.medium, "500")]}>
+                Contact
+              </Text>
+              <TextInput
+                style={[styles.input, typeface(font.medium, "500")]}
+                placeholder="Phone or email"
+                placeholderTextColor="#94A3B8"
+                value={contact}
+                onChangeText={setContact}
+              />
 
-              {/* Action Button */}
               <TouchableOpacity
-                onPress={handleSubmit}
-                disabled={isSubmitting || !name.trim()}
-                className={`mt-8 h-14 rounded-full items-center justify-center shadow-lg ${
-                  isSubmitting || !name.trim() ? "bg-slate-300" : "bg-slate-900"
-                }`}
-                style={{
-                  shadowColor: "#000",
-                  shadowOffset: { width: 0, height: 4 },
-                  shadowOpacity: 0.1,
-                  shadowRadius: 10,
+                onPress={() => {
+                  void handleSubmit();
                 }}
+                disabled={!canSubmit}
+                style={[styles.submit, !canSubmit && styles.submitOff]}
               >
                 {isSubmitting ? (
-                  <ActivityIndicator color="#ffffff" />
+                  <ActivityIndicator color="#FFFFFF" />
                 ) : (
-                  <Text className="text-white font-bold text-[14px]">
-                    Save Changes
+                  <Text style={[styles.submitText, typeface(font.semibold, "600")]}>
+                    Save
                   </Text>
                 )}
               </TouchableOpacity>
@@ -145,7 +142,7 @@ export function EditCreditModal({
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: "rgba(15, 23, 42, 0.4)", // Slate-900 with opacity
+    backgroundColor: "rgba(15, 23, 42, 0.4)",
     justifyContent: "center",
     alignItems: "center",
     padding: 24,
@@ -153,6 +150,69 @@ const styles = StyleSheet.create({
   container: {
     width: "100%",
     maxWidth: 400,
+    zIndex: 1,
+  },
+  card: {
+    backgroundColor: "#FAFBFD",
+    borderRadius: 22,
+    padding: 22,
+    zIndex: 1,
+  },
+  header: {
+    flexDirection: "row",
     alignItems: "center",
+    marginBottom: 18,
+  },
+  identity: {
+    flex: 1,
+    marginRight: 12,
+    minWidth: 0,
+  },
+  title: {
+    fontSize: 20,
+    color: INK,
+    letterSpacing: -0.4,
+  },
+  subtitle: {
+    marginTop: 3,
+    fontSize: 13,
+    color: MUTED,
+  },
+  close: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: "#EEF1F6",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  label: {
+    fontSize: 13,
+    color: MUTED,
+    marginBottom: 8,
+  },
+  input: {
+    height: 48,
+    borderRadius: 14,
+    backgroundColor: "#EEF1F6",
+    paddingHorizontal: 14,
+    fontSize: 15,
+    color: INK,
+    marginBottom: 14,
+  },
+  submit: {
+    height: 52,
+    borderRadius: 14,
+    backgroundColor: TINT,
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 4,
+  },
+  submitOff: {
+    backgroundColor: "#CBD5E1",
+  },
+  submitText: {
+    fontSize: 16,
+    color: "#FFFFFF",
   },
 });

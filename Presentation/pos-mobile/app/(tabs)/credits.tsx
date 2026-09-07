@@ -1,34 +1,48 @@
+import { DrawerMenuButton } from "@/components/navigation/DrawerMenuButton";
+import { useCredits } from "@/src/hooks/use-credits";
+import { formatPHP } from "@/src/lib/math";
+import { typeface, useInter } from "@/src/theme/typography";
+import type { CustomerCredit, CustomerCreditSummary } from "@/src/types/credit";
 import {
   ArrowUpDown,
-  CheckCircle2,
   History,
   ReceiptText,
   Search,
-  TrendingUp,
   UserCog,
-  Wallet,
 } from "lucide-react-native";
 import { Skeleton } from "moti/skeleton";
 import React, { useEffect, useMemo, useState } from "react";
 import {
+  Pressable,
   RefreshControl,
   ScrollView,
+  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
-
-import { useCredits } from "@/src/hooks/use-credits";
-import { cn } from "@/src/lib/utils";
-import type { CustomerCredit, CustomerCreditSummary } from "@/src/types/credit";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { CreditSummarySheet } from "@/components/credits/credit-summary-sheet";
 import { EditCreditModal } from "@/components/credits/edit-credit-modal";
 import { PayCreditModal } from "@/components/credits/pay-credit-modal";
 
+const INK = "#0F172A";
+const MUTED = "#64748B";
+const TINT = "#2563EB";
+const GREEN = "#15803D";
+
+const PERIODS = [
+  { label: "Today", value: "today" },
+  { label: "Week", value: "week" },
+  { label: "Month", value: "month" },
+  { label: "Year", value: "year" },
+] as const;
+
 export default function CreditsPage() {
+  const insets = useSafeAreaInsets();
+  const font = useInter();
   const {
     credits,
     refreshing,
@@ -41,23 +55,12 @@ export default function CreditsPage() {
 
   const [search, setSearch] = useState("");
   const [showSettled, setShowSettled] = useState(false);
-  const [sortOrder, setSortOrder] = useState<"asc" | "desc" | null>("desc");
-
-  const PERIODS = React.useMemo(
-    () => [
-      { label: "Today", value: "today" },
-      { label: "Week", value: "week" },
-      { label: "Month", value: "month" },
-      { label: "Year", value: "year" },
-    ],
-    [],
-  );
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
   const [selectedPeriod, setSelectedPeriod] = useState("today");
   const [creditStats, setCreditStats] = useState<
     import("@/src/types/credit").CreditStats | null
   >(null);
   const [statsLoading, setStatsLoading] = useState(false);
-
   const [selectedCredit, setSelectedCredit] = useState<CustomerCredit | null>(
     null,
   );
@@ -89,44 +92,6 @@ export default function CreditsPage() {
     };
   }, [selectedPeriod, getCreditStats]);
 
-  const handlePeriodChange = (period: string) => {
-    requestAnimationFrame(() => {
-      setSelectedPeriod(period);
-    });
-  };
-
-  const MemoizedPeriodPills = useMemo(
-    () => (
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        className="flex-row gap-2 mt-2 mb-2"
-      >
-        {PERIODS.map((p) => (
-          <TouchableOpacity
-            key={p.value}
-            onPress={() => handlePeriodChange(p.value)}
-            className={cn(
-              "px-4 h-9 rounded-full justify-center items-center",
-              selectedPeriod === p.value ? "bg-slate-900" : "bg-slate-100",
-            )}
-            activeOpacity={0.85}
-          >
-            <Text
-              className={cn(
-                "text-xs font-bold",
-                selectedPeriod === p.value ? "text-white" : "text-slate-900",
-              )}
-            >
-              {p.label}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
-    ),
-    [selectedPeriod, PERIODS],
-  );
-
   const handleOpenSummary = async (id: string) => {
     setIsSummaryOpen(true);
     setIsSummaryLoading(true);
@@ -137,221 +102,244 @@ export default function CreditsPage() {
 
   const processedCredits = useMemo(() => {
     const result = [...credits];
-    if (sortOrder) {
-      result.sort((a, b) =>
-        sortOrder === "asc"
-          ? a.creditAmount - b.creditAmount
-          : b.creditAmount - a.creditAmount,
-      );
-    }
+    result.sort((a, b) =>
+      sortOrder === "asc"
+        ? a.creditAmount - b.creditAmount
+        : b.creditAmount - a.creditAmount,
+    );
     return result;
   }, [credits, sortOrder]);
 
-  const formatPHP = (val: number) =>
-    `₱${val.toLocaleString("en-PH", { minimumFractionDigits: 2 })}`;
+  const maxDebt = Math.max(
+    ...processedCredits.map((c) => c.creditAmount),
+    1,
+  );
 
   return (
-    // edges={[]} prevents double safe-area layout padding with parent header navigators
-    <SafeAreaView className="flex-1 bg-white" edges={[]}>
-      {/* Stats Section Wrapper Area */}
-      <View className="px-4 pt-2">
-        {MemoizedPeriodPills}
-        <View className="flex-row gap-3 mt-2">
-          {/* Collected Card */}
-          <View className="flex-1 bg-white border border-slate-100 rounded-3xl p-4 flex-row items-center min-h-[90px]">
-            <View className="bg-emerald-50 rounded-full p-3 mr-3">
-              <TrendingUp size={22} color="#059669" />
-            </View>
-            <View className="flex-1">
-              <Text className="text-xs text-slate-400 font-bold tracking-tight">
-                Collected
-              </Text>
-              {statsLoading ? (
-                <View className="mt-1">
-                  <Skeleton
-                    colorMode="light"
-                    width={80}
-                    height={20}
-                    radius={8}
-                  />
-                </View>
-              ) : (
-                Boolean(creditStats) && (
-                  <Text className="text-xl font-black tracking-tighter text-slate-900 mt-1">
-                    {formatPHP(creditStats?.totalCollected ?? 0)}
-                  </Text>
-                )
-              )}
-            </View>
-          </View>
+    <View style={[styles.screen, { paddingTop: insets.top + 10 }]}>
+      <View style={styles.header}>
+        <DrawerMenuButton />
+        <View style={styles.identity}>
+          <Text style={[styles.title, typeface(font.bold, "700")]}>Credits</Text>
+          <Text style={[styles.subtitle, typeface(font.medium, "500")]}>
+            {processedCredits.length} customer
+            {processedCredits.length === 1 ? "" : "s"}
+          </Text>
+        </View>
+        <TouchableOpacity
+          onPress={() => setShowSettled((v) => !v)}
+          style={[styles.headerGhost, showSettled && styles.headerGhostOn]}
+          accessibilityLabel="Show settled accounts"
+        >
+          <History size={14} color={showSettled ? TINT : INK} strokeWidth={1.8} />
+          <Text
+            style={[
+              styles.headerGhostText,
+              showSettled && { color: TINT },
+              typeface(font.medium, "500"),
+            ]}
+          >
+            Settled
+          </Text>
+        </TouchableOpacity>
+      </View>
 
-          {/* Debt Left Card */}
-          <View className="flex-1 bg-white border border-slate-100 rounded-3xl p-4 flex-row items-center min-h-[90px]">
-            <View className="bg-slate-50 rounded-full p-3 mr-3">
-              <Wallet size={22} color="#334155" />
-            </View>
-            <View className="flex-1">
-              <Text className="text-xs text-slate-400 font-bold tracking-tight">
-                Debt Left
+      <View style={styles.segment}>
+        {PERIODS.map((item) => {
+          const active = selectedPeriod === item.value;
+          return (
+            <Pressable
+              key={item.value}
+              onPress={() => setSelectedPeriod(item.value)}
+              style={[styles.segmentItem, active && styles.segmentItemOn]}
+            >
+              <Text
+                style={[
+                  styles.segmentText,
+                  active && styles.segmentTextOn,
+                  typeface(active ? font.semibold : font.medium, "600"),
+                ]}
+              >
+                {item.label}
               </Text>
-              {statsLoading ? (
-                <View className="mt-1">
-                  <Skeleton
-                    colorMode="light"
-                    width={80}
-                    height={20}
-                    radius={8}
-                  />
-                </View>
-              ) : (
-                Boolean(creditStats) && (
-                  <Text className="text-xl font-black tracking-tighter text-slate-900 mt-1">
-                    {formatPHP(creditStats?.totalActiveDebts ?? 0)}
-                  </Text>
-                )
+            </Pressable>
+          );
+        })}
+      </View>
+
+      <View style={styles.washes}>
+        <View style={[styles.wash, { backgroundColor: "#EAF8D8" }]}>
+          <Text style={[styles.washLabel, typeface(font.medium, "500")]}>
+            Collected
+          </Text>
+          {statsLoading ? (
+            <Skeleton colorMode="light" width={72} height={20} radius={6} />
+          ) : (
+            <Text
+              style={[styles.washValue, styles.washMoney, typeface(font.bold, "700")]}
+              numberOfLines={1}
+            >
+              {formatPHP(creditStats?.totalCollected ?? 0)}
+            </Text>
+          )}
+        </View>
+        <View style={[styles.wash, { backgroundColor: "#FDE6D4" }]}>
+          <Text style={[styles.washLabel, typeface(font.medium, "500")]}>
+            Outstanding
+          </Text>
+          {statsLoading ? (
+            <Skeleton colorMode="light" width={72} height={20} radius={6} />
+          ) : (
+            <Text
+              style={[
+                styles.washValue,
+                (creditStats?.totalOutstanding ??
+                  creditStats?.totalActiveDebts ??
+                  0) > 0 && styles.washAlert,
+                typeface(font.bold, "700"),
+              ]}
+              numberOfLines={1}
+            >
+              {formatPHP(
+                creditStats?.totalOutstanding ??
+                  creditStats?.totalActiveDebts ??
+                  0,
               )}
-            </View>
-          </View>
+            </Text>
+          )}
         </View>
       </View>
 
       <ScrollView
-        className="flex-1 px-4 mt-2"
-        showsVerticalScrollIndicator={false}
+        style={styles.list}
+        contentContainerStyle={styles.listContent}
+        keyboardShouldPersistTaps="handled"
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
             onRefresh={() => fetchCredits(search, showSettled, true)}
+            tintColor={TINT}
           />
         }
       >
-        <View className="flex-row gap-2 mt-4">
-          <View className="flex-1 flex-row items-center bg-slate-100 rounded-2xl px-4 h-12">
-            <Search size={18} color="#94a3b8" />
-            <TextInput
-              placeholder="Search customer..."
-              className="flex-1 ml-2 text-slate-900 font-bold h-full"
-              value={search}
-              onChangeText={setSearch}
-            />
-          </View>
-          <TouchableOpacity
-            onPress={() => setShowSettled(!showSettled)}
-            className={cn(
-              "h-12 w-12 rounded-2xl justify-center items-center border",
-              showSettled
-                ? "bg-slate-900 border-slate-900"
-                : "bg-white border-slate-200",
-            )}
-          >
-            <History size={18} color={showSettled ? "#fff" : "#64748b"} />
-          </TouchableOpacity>
+        <View style={styles.search}>
+          <Search size={16} color="#94A3B8" strokeWidth={2} />
+          <TextInput
+            placeholder="Search customers"
+            placeholderTextColor="#94A3B8"
+            value={search}
+            onChangeText={setSearch}
+            style={[styles.searchInput, typeface(font.medium, "500")]}
+          />
         </View>
 
-        <View className="flex-row items-center justify-between mt-6 mb-2">
-          <Text className="text-[11px] font-bold uppercase text-slate-400 tracking-wider px-1">
-            Customer List
+        <View style={styles.listHead}>
+          <Text style={[styles.listTitle, typeface(font.bold, "700")]}>
+            Customers
           </Text>
-          <TouchableOpacity
+          <Pressable
             onPress={() =>
               setSortOrder((prev) => (prev === "desc" ? "asc" : "desc"))
             }
-            className="flex-row items-center"
+            style={styles.sortBtn}
           >
-            <Text className="text-[11px] font-bold text-slate-400 mr-1">
-              Sort by Balance
+            <Text style={[styles.sortText, typeface(font.medium, "500")]}>
+              Balance
             </Text>
-            <ArrowUpDown size={12} color="#94a3b8" />
-          </TouchableOpacity>
+            <ArrowUpDown size={12} color="#94A3B8" />
+          </Pressable>
         </View>
 
-        {/* Customer Rows Renderer */}
         {refreshing && credits.length === 0 ? (
-          <View className="gap-y-3 mt-2">
-            {[1, 2, 3].map((i) => (
-              <Skeleton
-                key={i}
-                colorMode="light"
-                width="100%"
-                height={130}
-                radius={24}
-              />
-            ))}
-          </View>
+          [1, 2, 3].map((i) => (
+            <View key={i} style={styles.row}>
+              <Skeleton colorMode="light" width="80%" height={16} radius={6} />
+            </View>
+          ))
+        ) : processedCredits.length === 0 ? (
+          <Text style={[styles.empty, typeface(font.regular, "400")]}>
+            No customers match
+          </Text>
         ) : (
-          processedCredits.map((c) => (
-            <View
-              key={c.id}
-              className="bg-white border border-slate-100 rounded-3xl p-4 mb-3 shadow-sm"
-            >
-              <View className="flex-row justify-between items-start">
-                <View className="flex-1">
-                  <View className="flex-row items-center">
-                    <Text className="font-bold text-slate-800 text-base uppercase">
-                      {c.customerName}
-                    </Text>
-                    {c.creditAmount === 0 && (
-                      <CheckCircle2
-                        size={15}
-                        color="#10b981"
-                        style={{ marginLeft: 6 }}
-                      />
-                    )}
-                  </View>
-                  <Text className="text-slate-400 text-xs font-semibold mt-1">
-                    {c.contactInfo || "No contact number added"}
+          processedCredits.map((customer) => {
+            const settled = customer.creditAmount === 0;
+            const share = Math.max(
+              0.08,
+              Math.min(1, customer.creditAmount / maxDebt),
+            );
+            return (
+              <View key={customer.id} style={styles.row}>
+                {!settled ? (
+                  <View
+                    style={[
+                      styles.rowFill,
+                      { width: `${Math.round(share * 100)}%` },
+                    ]}
+                  />
+                ) : null}
+                <View style={styles.rowBody}>
+                  <Text
+                    style={[styles.rowName, typeface(font.semibold, "600")]}
+                    numberOfLines={1}
+                  >
+                    {customer.customerName}
+                  </Text>
+                  <Text
+                    style={[styles.rowMeta, typeface(font.medium, "500")]}
+                    numberOfLines={1}
+                  >
+                    {customer.contactInfo || "No contact"}
                   </Text>
                 </View>
                 <Text
-                  className={cn(
-                    "font-black text-base",
-                    c.creditAmount > 0 ? "text-rose-600" : "text-emerald-600",
-                  )}
+                  style={[
+                    styles.rowAmount,
+                    { color: settled ? GREEN : "#B45309" },
+                    typeface(font.semibold, "600"),
+                  ]}
                 >
-                  {c.creditAmount === 0 ? "Settled" : formatPHP(c.creditAmount)}
+                  {settled ? "Settled" : formatPHP(customer.creditAmount)}
                 </Text>
-              </View>
-
-              <View className="flex-row mt-4 pt-3 border-t border-slate-50 gap-2">
-                <TouchableOpacity
-                  onPress={() => setEditingCredit(c)}
-                  className="bg-slate-50 border border-slate-100 h-10 px-4 rounded-xl justify-center"
-                >
-                  <UserCog size={16} color="#64748b" />
-                </TouchableOpacity>
-                <TouchableOpacity
-                  onPress={() => handleOpenSummary(c.id)}
-                  className="flex-1 bg-slate-50 border border-slate-100 h-10 px-4 rounded-xl flex-row items-center justify-center"
-                >
-                  <ReceiptText size={15} color="#64748b" />
-                  <Text className="ml-2 font-bold text-slate-600 text-xs uppercase">
-                    Summary
-                  </Text>
-                </TouchableOpacity>
-                {c.creditAmount > 0 && (
-                  <TouchableOpacity
-                    onPress={() => setSelectedCredit(c)}
-                    className="flex-1 bg-emerald-500 h-10 px-4 rounded-xl justify-center items-center"
+                <View style={styles.rowActions}>
+                  <Pressable
+                    onPress={() => setEditingCredit(customer)}
+                    style={styles.iconAction}
+                    hitSlop={8}
                   >
-                    <Text className="font-black text-white text-xs uppercase tracking-wider">
-                      Pay Debt
-                    </Text>
-                  </TouchableOpacity>
-                )}
+                    <UserCog size={15} color={MUTED} />
+                  </Pressable>
+                  <Pressable
+                    onPress={() => handleOpenSummary(customer.id)}
+                    style={styles.iconAction}
+                    hitSlop={8}
+                  >
+                    <ReceiptText size={15} color={MUTED} />
+                  </Pressable>
+                  {!settled ? (
+                    <Pressable
+                      onPress={() => setSelectedCredit(customer)}
+                      style={styles.payBtn}
+                    >
+                      <Text
+                        style={[styles.payText, typeface(font.semibold, "600")]}
+                      >
+                        Pay
+                      </Text>
+                    </Pressable>
+                  ) : null}
+                </View>
               </View>
-            </View>
-          ))
+            );
+          })
         )}
       </ScrollView>
 
-      {/* Sheet Management Controllers */}
       <CreditSummarySheet
         summary={summaryData}
         isOpen={isSummaryOpen}
         isLoading={isSummaryLoading}
         onClose={() => setIsSummaryOpen(false)}
       />
-
       <EditCreditModal
         credit={editingCredit}
         isOpen={!!editingCredit}
@@ -367,7 +355,6 @@ export default function CreditsPage() {
           }
         }}
       />
-
       <PayCreditModal
         credit={selectedCredit}
         isOpen={!!selectedCredit}
@@ -379,6 +366,218 @@ export default function CreditsPage() {
           }
         }}
       />
-    </SafeAreaView>
+    </View>
   );
 }
+
+const styles = StyleSheet.create({
+  screen: {
+    flex: 1,
+    backgroundColor: "#FAFBFD",
+  },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 22,
+    marginBottom: 16,
+  },
+  identity: {
+    flex: 1,
+    marginLeft: 12,
+    marginRight: 8,
+    minWidth: 0,
+  },
+  title: {
+    fontSize: 20,
+    color: INK,
+    letterSpacing: -0.4,
+  },
+  subtitle: {
+    marginTop: 3,
+    fontSize: 13,
+    color: MUTED,
+  },
+  headerGhost: {
+    height: 32,
+    paddingHorizontal: 10,
+    borderRadius: 10,
+    backgroundColor: "#EEF1F6",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+  },
+  headerGhostOn: {
+    backgroundColor: "#DCEBFF",
+  },
+  headerGhostText: {
+    fontSize: 12,
+    color: INK,
+  },
+  segment: {
+    flexDirection: "row",
+    backgroundColor: "#EEF1F6",
+    borderRadius: 18,
+    padding: 4,
+    marginHorizontal: 22,
+    marginBottom: 14,
+  },
+  segmentItem: {
+    flex: 1,
+    height: 40,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  segmentItemOn: {
+    backgroundColor: TINT,
+  },
+  segmentText: {
+    fontSize: 13,
+    color: INK,
+  },
+  segmentTextOn: {
+    color: "#FFFFFF",
+  },
+  washes: {
+    flexDirection: "row",
+    gap: 8,
+    paddingHorizontal: 22,
+    marginBottom: 14,
+  },
+  wash: {
+    flex: 1,
+    borderRadius: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+  },
+  washLabel: {
+    fontSize: 11,
+    color: INK,
+    opacity: 0.65,
+  },
+  washValue: {
+    marginTop: 6,
+    fontSize: 16,
+    color: INK,
+    letterSpacing: -0.4,
+    fontVariant: ["tabular-nums"],
+  },
+  washMoney: {
+    color: TINT,
+  },
+  washAlert: {
+    color: "#B45309",
+  },
+  list: {
+    flex: 1,
+  },
+  listContent: {
+    paddingHorizontal: 22,
+    paddingBottom: 28,
+  },
+  search: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#EEF1F6",
+    borderRadius: 16,
+    paddingHorizontal: 14,
+    height: 46,
+  },
+  searchInput: {
+    flex: 1,
+    marginLeft: 8,
+    fontSize: 14,
+    color: INK,
+    paddingVertical: 0,
+  },
+  listHead: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginTop: 22,
+    marginBottom: 6,
+  },
+  listTitle: {
+    fontSize: 13,
+    color: INK,
+    letterSpacing: 0.8,
+    textTransform: "uppercase",
+  },
+  sortBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  sortText: {
+    fontSize: 12,
+    color: MUTED,
+  },
+  row: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 12,
+    paddingHorizontal: 10,
+    marginBottom: 8,
+    borderRadius: 12,
+    overflow: "hidden",
+    backgroundColor: "#F8FAFC",
+  },
+  rowFill: {
+    position: "absolute",
+    left: 0,
+    top: 0,
+    bottom: 0,
+    backgroundColor: "#FDE6D4",
+    borderRadius: 12,
+  },
+  rowBody: {
+    flex: 1,
+    minWidth: 0,
+    marginRight: 8,
+    zIndex: 1,
+  },
+  rowName: {
+    fontSize: 15,
+    color: INK,
+  },
+  rowMeta: {
+    marginTop: 2,
+    fontSize: 12,
+    color: MUTED,
+  },
+  rowAmount: {
+    fontSize: 13,
+    fontVariant: ["tabular-nums"],
+    marginRight: 8,
+    zIndex: 1,
+  },
+  rowActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    zIndex: 1,
+  },
+  iconAction: {
+    width: 32,
+    height: 32,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  payBtn: {
+    height: 32,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    backgroundColor: TINT,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  payText: {
+    fontSize: 12,
+    color: "#FFFFFF",
+  },
+  empty: {
+    paddingVertical: 20,
+    fontSize: 14,
+    color: MUTED,
+  },
+});

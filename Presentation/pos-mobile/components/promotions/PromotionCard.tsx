@@ -1,10 +1,14 @@
-import { cn } from "@/src/lib/utils";
-import { Edit3, Layers, Trash2 } from "lucide-react-native";
-import React from "react";
-import { Switch, Text, TouchableOpacity, View } from "react-native";
-import { formatPHP } from "../../src/lib/math";
-import { Promotion, PromotionType } from "../../src/types/promotion";
-import TypeBadge from "./TypeBadge";
+import { formatPHP } from "@/src/lib/math";
+import { typeface, useInter } from "@/src/theme/typography";
+import { Promotion, PromotionType } from "@/src/types/promotion";
+import { Edit3, Trash2 } from "lucide-react-native";
+import React, { useEffect, useState } from "react";
+import { Pressable, StyleSheet, Switch, Text, View } from "react-native";
+
+const INK = "#0F172A";
+const MUTED = "#64748B";
+const LINE = "rgba(15, 23, 42, 0.08)";
+const TINT = "#2563EB";
 
 interface PromotionCardProps {
   promotion: Promotion;
@@ -13,200 +17,257 @@ interface PromotionCardProps {
   onEdit: (promotion: Promotion) => void;
 }
 
+function typeLabel(type: Promotion["type"]) {
+  if (type === PromotionType.Bulk || type === "Bulk") return "Bulk";
+  if (type === PromotionType.Bundle || type === "Bundle") return "Bundle";
+  if (type === PromotionType.Discount || type === "Discount") return "Discount";
+  return "Promo";
+}
+
 export default function PromotionCard({
   promotion,
   onToggle,
   onDelete,
   onEdit,
 }: PromotionCardProps) {
-  // Safe string & enum hybrid comparison to prevent TypeScript compiler crashes
+  const font = useInter();
+  const [optimisticActive, setOptimisticActive] = useState<boolean | null>(
+    null,
+  );
+
+  useEffect(() => {
+    setOptimisticActive(null);
+  }, [promotion.isActive, promotion.id]);
+
   const isBundle =
     promotion.type === PromotionType.Bundle || promotion.type === "Bundle";
   const isDiscount =
-    promotion.type === PromotionType.Discount || promotion.type === "Discount";
+    promotion.type === PromotionType.Discount ||
+    promotion.type === "Discount";
 
   const flatPrice = promotion.tiers[0]?.price ?? 0;
   const basePrice = promotion.originalPrice ?? 0;
+  const paused = !(optimisticActive ?? promotion.isActive);
+  const kind = typeLabel(promotion.type);
+  const subtitle = [kind, promotion.name].filter(Boolean).join(" · ");
 
   return (
-    <View
-      className={cn(
-        "rounded-2xl p-4 mb-3 border shadow-sm",
-        promotion.isActive
-          ? "bg-white border-slate-100"
-          : "bg-slate-50/70 border-slate-200/60",
-      )}
-    >
-      {/* --- HEADER --- */}
-      <View className="flex-row justify-between items-center mb-2">
-        <View className="flex-1 pr-2">
-          <TypeBadge type={promotion.type} />
+    <View style={styles.card}>
+      <View style={styles.top}>
+        <View style={styles.topBody}>
           <Text
-            className="text-[11px] font-medium text-slate-400 mt-1"
             numberOfLines={1}
+            style={[styles.product, typeface(font.semibold, "600")]}
           >
-            {promotion.name}
+            {promotion.productName ?? "Unknown product"}
           </Text>
-        </View>
-
-        {/* Minimalized Toggle Layout */}
-        <View className="flex-row items-center gap-x-1">
           <Text
-            className={cn(
-              "text-[9px] font-black uppercase tracking-tight",
-              promotion.isActive ? "text-blue-600" : "text-slate-400",
-            )}
+            numberOfLines={1}
+            style={[styles.meta, typeface(font.medium, "500")]}
           >
-            {promotion.isActive ? "Live" : "Paused"}
+            {subtitle}
           </Text>
-          <Switch
-            value={promotion.isActive}
-            onValueChange={() => onToggle(promotion.mainProductId)}
-            trackColor={{ false: "#cbd5e1", true: "#bfdbfe" }}
-            thumbColor={promotion.isActive ? "#2563eb" : "#64748b"}
-            style={{ transform: [{ scaleX: 0.75 }, { scaleY: 0.75 }] }}
-          />
-        </View>
-      </View>
-
-      {/* --- CORE ITEM INFORMATION --- */}
-      <View className="mb-2.5">
-        <Text
-          className={cn(
-            "text-xl font-black tracking-tight",
-            promotion.isActive ? "text-slate-900" : "text-slate-400 font-bold",
-          )}
-          numberOfLines={1}
-        >
-          {promotion.productName ?? "Unknown Product"}
-        </Text>
-
-        {/* Combo Subtitle Rule */}
-        {isBundle && promotion.tieUpProductName && (
-          <View className="flex-row items-center mt-0.5">
-            <Layers
-              size={10}
-              color={promotion.isActive ? "#64748b" : "#94a3b8"}
-            />
+          {isBundle && promotion.tieUpProductName ? (
             <Text
-              className={cn(
-                "font-medium text-xs ml-1",
-                promotion.isActive ? "text-slate-500" : "text-slate-400",
-              )}
               numberOfLines={1}
+              style={[styles.meta, typeface(font.medium, "500")]}
             >
-              Pairs with:{" "}
-              <Text
-                className={
-                  promotion.isActive
-                    ? "font-bold text-slate-800"
-                    : "font-medium text-slate-500"
-                }
-              >
-                {promotion.tieUpProductName}
-              </Text>
+              With {promotion.tieUpProductName}
             </Text>
-          </View>
-        )}
-
-        <Text className="text-slate-400 font-bold text-[11px] mt-1">
-          Standard Retail: {formatPHP(basePrice)}
-        </Text>
+          ) : null}
+        </View>
+        <View
+          style={[styles.statusPill, paused ? styles.statusPaused : styles.statusLive]}
+        >
+          <Text
+            style={[
+              styles.statusText,
+              { color: paused ? MUTED : "#15803D" },
+              typeface(font.medium, "500"),
+            ]}
+          >
+            {paused ? "Paused" : "Live"}
+          </Text>
+        </View>
+        <Switch
+          value={!paused}
+          onValueChange={() => {
+            setOptimisticActive(paused);
+            onToggle(promotion.mainProductId);
+          }}
+          trackColor={{ false: "#CBD5E1", true: "#BFDBFE" }}
+          thumbColor={!paused ? TINT : "#94A3B8"}
+        />
       </View>
 
-      {/* --- PRICING DISPLAY (Ghost Dividers Pattern) --- */}
+      <View style={styles.hairline} />
+
       {isDiscount ? (
-        <View className="border-t border-b border-slate-100 py-2.5 mb-3 flex-row justify-between items-center">
-          <View>
-            <Text className="text-slate-400 font-bold text-[9px] uppercase tracking-wide">
-              Promo Retail Price
-            </Text>
-            <Text
-              className={cn(
-                "text-2xl font-black mt-0.5",
-                promotion.isActive ? "text-blue-600" : "text-slate-400",
-              )}
-            >
-              {formatPHP(flatPrice)}
-            </Text>
-          </View>
-          <Text
-            className={cn(
-              "font-black text-xs uppercase",
-              promotion.isActive ? "text-emerald-600" : "text-slate-400",
-            )}
-          >
-            Save {formatPHP(basePrice - flatPrice)} each
+        <View style={styles.priceRow}>
+          <Text style={[styles.price, typeface(font.bold, "700")]}>
+            {formatPHP(flatPrice)}
           </Text>
+          <View style={styles.priceEnd}>
+            {basePrice > 0 ? (
+              <Text style={[styles.retail, typeface(font.medium, "500")]}>
+                {formatPHP(basePrice)}
+              </Text>
+            ) : null}
+            {basePrice > flatPrice ? (
+              <Text style={[styles.save, typeface(font.medium, "500")]}>
+                Save {formatPHP(basePrice - flatPrice)}
+              </Text>
+            ) : null}
+          </View>
         </View>
       ) : (
-        <View className="border-t border-slate-100 pt-2 mb-3">
+        <View>
           {promotion.tiers.map((tier, index) => {
             const wholesaleImpact = basePrice * tier.quantity - tier.price;
             return (
-              <View
-                key={tier.id ?? index}
-                className="flex-row justify-between items-center py-1.5 border-b border-slate-100/60 last:border-b-0"
-              >
-                <Text
-                  className={cn(
-                    "font-medium text-xs",
-                    promotion.isActive ? "text-slate-700" : "text-slate-400",
-                  )}
-                >
-                  {tier.quantity} units for{" "}
-                  <Text
-                    className={cn(
-                      "font-black",
-                      promotion.isActive ? "text-blue-600" : "text-slate-500",
-                    )}
-                  >
-                    {formatPHP(tier.price)}
-                  </Text>
+              <View key={tier.id ?? index} style={styles.tierRow}>
+                <Text style={[styles.tier, typeface(font.medium, "500")]}>
+                  {tier.quantity} for {formatPHP(tier.price)}
                 </Text>
-
-                {wholesaleImpact > 0 && (
-                  <Text
-                    className={cn(
-                      "text-[10px] font-bold uppercase",
-                      promotion.isActive
-                        ? "text-emerald-600"
-                        : "text-slate-400",
-                    )}
-                  >
+                {wholesaleImpact > 0 ? (
+                  <Text style={[styles.save, typeface(font.medium, "500")]}>
                     Save {formatPHP(wholesaleImpact)}
                   </Text>
-                )}
+                ) : null}
               </View>
             );
           })}
         </View>
       )}
 
-      {/* --- ACTIONS BAR --- */}
-      <View className="flex-row gap-2">
-        <TouchableOpacity
+      <View style={styles.actions}>
+        <Pressable
           onPress={() => onEdit(promotion)}
-          activeOpacity={0.7}
-          className="flex-1 flex-row items-center justify-center bg-slate-50 py-2 rounded-lg border border-slate-100"
+          style={styles.action}
+          hitSlop={8}
         >
-          <Edit3 size={12} color="#475569" />
-          <Text className="ml-1.5 text-slate-600 font-bold text-xs uppercase tracking-tight">
+          <Edit3 size={14} color={MUTED} strokeWidth={2} />
+          <Text style={[styles.actionText, typeface(font.medium, "500")]}>
             Edit
           </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
+        </Pressable>
+        <Pressable
           onPress={() => onDelete(promotion.mainProductId)}
-          activeOpacity={0.7}
-          className="flex-1 flex-row items-center justify-center bg-rose-50/20 py-2 rounded-lg border border-rose-100/60"
+          style={styles.action}
+          hitSlop={8}
         >
-          <Trash2 size={12} color="#e11d48" />
-          <Text className="ml-1.5 text-rose-600 font-bold text-xs uppercase tracking-tight">
+          <Trash2 size={14} color="#E11D48" strokeWidth={2} />
+          <Text style={[styles.deleteText, typeface(font.medium, "500")]}>
             Delete
           </Text>
-        </TouchableOpacity>
+        </Pressable>
       </View>
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  card: {
+    backgroundColor: "#F4F6FA",
+    borderRadius: 16,
+    paddingHorizontal: 16,
+    paddingTop: 14,
+    paddingBottom: 10,
+    marginBottom: 12,
+  },
+  top: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  topBody: {
+    flex: 1,
+    minWidth: 0,
+  },
+  product: {
+    fontSize: 16,
+    color: INK,
+    letterSpacing: -0.2,
+  },
+  meta: {
+    marginTop: 2,
+    fontSize: 13,
+    color: MUTED,
+  },
+  statusPill: {
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: 999,
+  },
+  statusLive: {
+    backgroundColor: "#E7F8EE",
+  },
+  statusPaused: {
+    backgroundColor: "#EEF1F6",
+  },
+  statusText: {
+    fontSize: 10,
+  },
+  hairline: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: LINE,
+    marginTop: 12,
+    marginBottom: 10,
+  },
+  priceRow: {
+    flexDirection: "row",
+    alignItems: "baseline",
+    justifyContent: "space-between",
+    gap: 12,
+  },
+  price: {
+    fontSize: 22,
+    color: TINT,
+    letterSpacing: -0.4,
+    fontVariant: ["tabular-nums"],
+  },
+  priceEnd: {
+    alignItems: "flex-end",
+  },
+  retail: {
+    fontSize: 13,
+    color: MUTED,
+    textDecorationLine: "line-through",
+    fontVariant: ["tabular-nums"],
+  },
+  save: {
+    fontSize: 13,
+    color: "#15803D",
+    fontVariant: ["tabular-nums"],
+  },
+  tierRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: 5,
+  },
+  tier: {
+    fontSize: 15,
+    color: INK,
+    fontVariant: ["tabular-nums"],
+  },
+  actions: {
+    flexDirection: "row",
+    gap: 20,
+    marginTop: 10,
+  },
+  action: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingVertical: 6,
+  },
+  actionText: {
+    fontSize: 13,
+    color: MUTED,
+  },
+  deleteText: {
+    fontSize: 13,
+    color: "#E11D48",
+  },
+});

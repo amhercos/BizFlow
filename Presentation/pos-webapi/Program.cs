@@ -25,12 +25,16 @@ try
     var builder = WebApplication.CreateBuilder(args);
     builder.Logging.ClearProviders();
 
-
-    var port = Environment.GetEnvironmentVariable("PORT") ?? "8080";
-    builder.WebHost.ConfigureKestrel(options =>
+    // Only force Kestrel port 8080 in non-Development environments (e.g., Docker/Cloud)
+    // Allows Visual Studio / launchSettings.json HTTPS ports to work in Development mode
+    if (!builder.Environment.IsDevelopment())
     {
-        options.ListenAnyIP(int.Parse(port));
-    });
+        var port = Environment.GetEnvironmentVariable("PORT") ?? "8080";
+        builder.WebHost.ConfigureKestrel(options =>
+        {
+            options.ListenAnyIP(int.Parse(port));
+        });
+    }
 
     // Configuration Loading
     builder.Configuration.SetBasePath(AppContext.BaseDirectory);
@@ -54,7 +58,6 @@ try
         });
     builder.Services.AddHttpContextAccessor();
 
-  
     builder.Services.AddCors(options =>
     {
         options.AddPolicy("_myAllowSpecificOrigins", policy =>
@@ -123,7 +126,6 @@ try
     });
 
     var app = builder.Build();
-    
 
     using (var scope = app.Services.CreateScope())
     {
@@ -150,11 +152,10 @@ try
     app.UseMiddleware<ExceptionHandlingMiddleware>();
     app.UseSerilogRequestLogging();
 
-  
     app.UseSwagger();
     app.UseSwaggerUI(c => {
         c.SwaggerEndpoint("/swagger/v1/swagger.json", "BizFlow API V1");
-        c.RoutePrefix = string.Empty;
+        c.RoutePrefix = "swagger"; // Serves Swagger UI at /swagger instead of /
     });
 
     app.UseRouting();

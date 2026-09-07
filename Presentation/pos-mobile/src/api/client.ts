@@ -6,11 +6,13 @@ import axios, {
   InternalAxiosRequestConfig,
 } from "axios";
 import { router } from "expo-router";
-import * as SecureStore from "expo-secure-store";
 import { showToast } from "../utils/toast";
 
 const BASE_URL = process.env.EXPO_PUBLIC_API_URL;
 const HEALTH_URL = process.env.EXPO_PUBLIC_HEALTH_URL;
+
+const TOKEN_KEY = "bizflow_token";
+const USER_KEY = "bizflow_user";
 
 if (!BASE_URL) {
   console.warn("[System] EXPO_PUBLIC_API_URL is not defined in .env");
@@ -52,7 +54,7 @@ apiClient.interceptors.request.use(
   async (
     config: InternalAxiosRequestConfig,
   ): Promise<InternalAxiosRequestConfig> => {
-    const token = await SecureStore.getItemAsync("token");
+    const token = await AsyncStorage.getItem(TOKEN_KEY);
     if (token && config.headers) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -105,8 +107,8 @@ apiClient.interceptors.response.use(
         showToast.error("Session Expired", "Please sign in again.");
 
         await Promise.all([
-          SecureStore.deleteItemAsync("token"),
-          AsyncStorage.removeItem("bizflow_user"),
+          AsyncStorage.removeItem(TOKEN_KEY),
+          AsyncStorage.removeItem(USER_KEY),
         ]).catch(() => null);
 
         router.replace("/");

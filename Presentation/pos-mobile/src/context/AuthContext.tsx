@@ -1,6 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { isAxiosError } from "axios";
-import * as SecureStore from "expo-secure-store";
 import React, {
   createContext,
   ReactElement,
@@ -25,6 +24,9 @@ interface AuthContextType extends AuthState {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+const TOKEN_KEY = "bizflow_token";
+const USER_KEY = "bizflow_user";
+
 export function AuthProvider({
   children,
 }: {
@@ -39,8 +41,8 @@ export function AuthProvider({
   const logout = async (): Promise<void> => {
     try {
       await Promise.all([
-        SecureStore.deleteItemAsync("token"),
-        AsyncStorage.removeItem("bizflow_user"),
+        AsyncStorage.removeItem(TOKEN_KEY),
+        AsyncStorage.removeItem(USER_KEY),
       ]);
     } finally {
       setState({ token: null, user: null, isLoading: false });
@@ -51,8 +53,8 @@ export function AuthProvider({
     const bootstrapAsync = async (): Promise<void> => {
       try {
         const [token, userJson] = await Promise.all([
-          SecureStore.getItemAsync("token"),
-          AsyncStorage.getItem("bizflow_user"),
+          AsyncStorage.getItem(TOKEN_KEY),
+          AsyncStorage.getItem(USER_KEY),
         ]);
 
         const user = userJson ? (JSON.parse(userJson) as User) : null;
@@ -81,8 +83,8 @@ export function AuthProvider({
   const authenticate = async (token: string, user: User): Promise<void> => {
     try {
       await Promise.all([
-        SecureStore.setItemAsync("token", token),
-        AsyncStorage.setItem("bizflow_user", JSON.stringify(user)),
+        AsyncStorage.setItem(TOKEN_KEY, token),
+        AsyncStorage.setItem(USER_KEY, JSON.stringify(user)),
       ]);
       setState({ token, user, isLoading: false });
     } catch (error: unknown) {

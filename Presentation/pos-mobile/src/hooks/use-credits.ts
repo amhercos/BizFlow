@@ -1,46 +1,46 @@
+import {
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
 import { isAxiosError } from "axios";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import { Alert } from "react-native";
 import { creditService } from "../services/creditService";
 import type {
-    ApiErrorResponse,
-    CreditStats,
-    CustomerCredit,
-    CustomerCreditSummary,
-    UpdateCustomerCreditCommand,
+  ApiErrorResponse,
+  CreditStats,
+  CustomerCreditSummary,
+  UpdateCustomerCreditCommand,
 } from "../types/credit";
 
+export const CREDITS_QUERY_KEY = ["customer-credits"] as const;
+
 export function useCredits() {
-  const [credits, setCredits] = useState<CustomerCredit[]>([]);
-  const [loading, setLoading] = useState<boolean>(false);
-  const [refreshing, setRefreshing] = useState<boolean>(false);
+  const queryClient = useQueryClient();
+  const [search, setSearch] = useState("");
+  const [includeSettled, setIncludeSettled] = useState(false);
+
+  const query = useQuery({
+    queryKey: [...CREDITS_QUERY_KEY, search, includeSettled],
+    queryFn: () =>
+      creditService.getCredits(search.trim() || undefined, includeSettled),
+  });
 
   const fetchCredits = useCallback(
     async (
-      search?: string,
-      includeSettled: boolean = false,
-      isRefresh: boolean = false,
+      nextSearch?: string,
+      nextSettled: boolean = false,
+      _isRefresh: boolean = false,
     ) => {
-      if (isRefresh) setRefreshing(true);
-      else setLoading(true);
-
-      try {
-        const data = await creditService.getCredits(search, includeSettled);
-        setCredits(data);
-      } catch (error) {
-        console.error("[useCredits] fetchCredits Failed:", error);
-        if (!isRefresh) {
-          Alert.alert(
-            "Data Error",
-            "Could not synchronize records with the server.",
-          );
-        }
-      } finally {
-        setLoading(false);
-        setRefreshing(false);
+      const next = nextSearch ?? "";
+      if (next === search && nextSettled === includeSettled) {
+        await queryClient.invalidateQueries({ queryKey: CREDITS_QUERY_KEY });
+        return;
       }
+      setSearch(next);
+      setIncludeSettled(nextSettled);
     },
-    [],
+    [includeSettled, queryClient, search],
   );
 
   const getSummary = useCallback(
@@ -76,12 +76,11 @@ export function useCredits() {
         customerCreditId: creditId,
         amountPaid: amount,
       });
-      await fetchCredits(undefined, false, true);
+      await queryClient.invalidateQueries({ queryKey: CREDITS_QUERY_KEY });
     } catch (error: unknown) {
       let message = "The server rejected the payment record.";
 
       if (isAxiosError<ApiErrorResponse>(error)) {
-        // Matches your backend's new { Error = ex.Message }
         message =
           error.response?.data?.error ||
           error.response?.data?.message ||
@@ -98,7 +97,7 @@ export function useCredits() {
   ): Promise<void> => {
     try {
       await creditService.updateCredit(command);
-      await fetchCredits(undefined, false, true);
+      await queryClient.invalidateQueries({ queryKey: CREDITS_QUERY_KEY });
     } catch (error: unknown) {
       let message = "Failed to save customer changes.";
 
@@ -111,14 +110,10 @@ export function useCredits() {
     }
   };
 
-  useEffect(() => {
-    fetchCredits();
-  }, [fetchCredits]);
-
   return {
-    credits,
-    loading,
-    refreshing,
+    credits: query.data ?? [],
+    loading: query.isLoading,
+    refreshing: query.isRefetching,
     fetchCredits,
     getSummary,
     getCreditStats,

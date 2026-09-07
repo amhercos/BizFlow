@@ -1,7 +1,9 @@
-﻿namespace Application.Dto
-{
-    public record BasketItemDto(
+﻿namespace Application.Dto;
+
+public record BasketItemDto(
     Guid ProductId,
     int Quantity,
-    decimal UnitPrice);
-}
+    bool IsPack,
+    decimal UnitPrice,
+    decimal SubTotal
+);

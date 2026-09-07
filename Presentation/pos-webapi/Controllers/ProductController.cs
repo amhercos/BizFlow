@@ -56,9 +56,9 @@ namespace pos_webapi.Controllers
         [HttpPut("{id}")]
         public async Task<ActionResult<ProductDto>> Update(Guid id, [FromBody] UpdateProductCommand command)
         {
-            command.Id = id;
+            var commandWithId = command with { Id = id };
 
-            var result = await mediator.Send(command);
+            var result = await mediator.Send(commandWithId);
             return Ok(result);
         }
 

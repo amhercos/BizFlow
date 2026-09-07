@@ -1,19 +1,27 @@
+import { formatPHP } from "@/src/lib/math";
+import { typeface, useInter } from "@/src/theme/typography";
 import type { CustomerCredit } from "@/src/types/credit";
-import { Wallet, X } from "lucide-react-native";
+import { X } from "lucide-react-native";
 import React, { useEffect, useState } from "react";
 import {
-    ActivityIndicator,
-    Keyboard,
-    KeyboardAvoidingView,
-    Modal,
-    Platform,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    TouchableWithoutFeedback,
-    View,
+  ActivityIndicator,
+  Keyboard,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  TouchableWithoutFeedback,
+  View,
 } from "react-native";
+
+const INK = "#0F172A";
+const MUTED = "#64748B";
+const TINT = "#2563EB";
+const AMBER = "#B45309";
 
 interface PayCreditModalProps {
   credit: CustomerCredit | null;
@@ -28,10 +36,10 @@ export function PayCreditModal({
   onClose,
   onConfirm,
 }: PayCreditModalProps) {
-  const [amountPaid, setAmountPaid] = useState<string>("");
+  const font = useInter();
+  const [amountPaid, setAmountPaid] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Reset input when modal closes
   useEffect(() => {
     if (!isOpen) setAmountPaid("");
   }, [isOpen]);
@@ -51,12 +59,8 @@ export function PayCreditModal({
     }
   };
 
-  const isOverpaying = credit
-    ? Number(amountPaid) > credit.creditAmount
-    : false;
-
-  const formatPHP = (val: number) =>
-    `₱${val.toLocaleString("en-PH", { minimumFractionDigits: 2 })}`;
+  const isOverpaying = credit ? Number(amountPaid) > credit.creditAmount : false;
+  const canSubmit = !isSubmitting && Number(amountPaid) > 0;
 
   return (
     <Modal
@@ -67,96 +71,78 @@ export function PayCreditModal({
     >
       <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
         <View style={styles.overlay}>
+          <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
           <KeyboardAvoidingView
             behavior={Platform.OS === "ios" ? "padding" : "height"}
             style={styles.container}
           >
-            <View className="bg-white rounded-[32px] p-8 w-full shadow-2xl relative">
-              {/* Close Button */}
-              <TouchableOpacity
-                onPress={onClose}
-                className="absolute right-6 top-6 p-2 z-10"
-              >
-                <X size={20} color="#94a3b8" />
-              </TouchableOpacity>
-
-              {/* Header */}
-              <View className="items-center mb-6">
-                <View className="h-14 w-14 items-center justify-center rounded-2xl bg-emerald-50 mb-4">
-                  <Wallet size={28} color="#10b981" />
-                </View>
-                <Text className="text-xl font-bold text-slate-900">
-                  Record Payment
-                </Text>
-              </View>
-
-              {/* Input Section */}
-              <View className="mb-8">
-                <Text className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-1 mb-2">
-                  Payment for {credit?.customerName}
-                </Text>
-
-                <View
-                  className={`flex-row items-center h-14 rounded-2xl border px-4 bg-slate-50/50 ${
-                    isOverpaying ? "border-amber-500" : "border-slate-100"
-                  }`}
-                >
-                  <Text className="text-lg font-bold text-slate-400 mr-2">
-                    ₱
+            <View style={styles.card}>
+              <View style={styles.header}>
+                <View style={styles.identity}>
+                  <Text style={[styles.title, typeface(font.bold, "700")]}>
+                    Record payment
                   </Text>
-                  <TextInput
-                    className="flex-1 text-lg font-bold text-slate-900"
-                    placeholder="0.00"
-                    keyboardType="decimal-pad"
-                    value={amountPaid}
-                    onChangeText={setAmountPaid}
-                    autoFocus
-                  />
+                  <Text
+                    style={[styles.subtitle, typeface(font.medium, "500")]}
+                    numberOfLines={1}
+                  >
+                    {credit?.customerName ?? "Customer"}
+                  </Text>
                 </View>
-
-                {credit && (
-                  <View className="flex-row justify-between mt-3 px-1">
-                    <Text className="text-[11px] text-slate-400 italic">
-                      Balance: {formatPHP(credit.creditAmount)}
-                    </Text>
-                    {isOverpaying && (
-                      <Text className="text-[11px] font-bold text-amber-600 uppercase">
-                        Overpayment
-                      </Text>
-                    )}
-                  </View>
-                )}
+                <TouchableOpacity
+                  onPress={onClose}
+                  style={styles.close}
+                  accessibilityLabel="Close payment"
+                >
+                  <X size={18} color={INK} />
+                </TouchableOpacity>
               </View>
 
-              {/* Action Button */}
+              <Text style={[styles.label, typeface(font.medium, "500")]}>
+                Amount
+              </Text>
+              <View
+                style={[styles.field, isOverpaying && styles.fieldWarn]}
+              >
+                <Text style={[styles.prefix, typeface(font.semibold, "600")]}>
+                  ₱
+                </Text>
+                <TextInput
+                  style={[styles.input, typeface(font.semibold, "600")]}
+                  placeholder="0.00"
+                  placeholderTextColor="#94A3B8"
+                  keyboardType="decimal-pad"
+                  value={amountPaid}
+                  onChangeText={setAmountPaid}
+                  autoFocus
+                />
+              </View>
+
+              {credit ? (
+                <View style={styles.hintRow}>
+                  <Text style={[styles.hint, typeface(font.medium, "500")]}>
+                    Balance {formatPHP(credit.creditAmount)}
+                  </Text>
+                  {isOverpaying ? (
+                    <Text style={[styles.warn, typeface(font.semibold, "600")]}>
+                      Overpayment
+                    </Text>
+                  ) : null}
+                </View>
+              ) : null}
+
               <TouchableOpacity
-                onPress={handleSubmit}
-                disabled={
-                  isSubmitting || !amountPaid || Number(amountPaid) <= 0
-                }
-                className={`h-14 rounded-full items-center justify-center shadow-lg ${
-                  isSubmitting || !amountPaid || Number(amountPaid) <= 0
-                    ? "bg-slate-200"
-                    : "bg-emerald-600"
-                }`}
-                style={
-                  !isSubmitting && amountPaid
-                    ? {
-                        shadowColor: "#10b981",
-                        shadowOffset: { width: 0, height: 4 },
-                        shadowOpacity: 0.2,
-                        shadowRadius: 10,
-                      }
-                    : {}
-                }
+                onPress={() => {
+                  void handleSubmit();
+                }}
+                disabled={!canSubmit}
+                style={[styles.submit, !canSubmit && styles.submitOff]}
               >
                 {isSubmitting ? (
-                  <ActivityIndicator color="#ffffff" />
+                  <ActivityIndicator color="#FFFFFF" />
                 ) : (
-                  <Text className="text-white font-bold text-[14px]">
-                    Confirm{" "}
-                    {amountPaid ? formatPHP(Number(amountPaid)) : "₱0.00"}{" "}
-                    Payment
+                  <Text style={[styles.submitText, typeface(font.semibold, "600")]}>
+                    Confirm {amountPaid ? formatPHP(Number(amountPaid)) : "₱0.00"}
                   </Text>
                 )}
               </TouchableOpacity>
@@ -171,7 +157,7 @@ export function PayCreditModal({
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: "rgba(15, 23, 42, 0.6)",
+    backgroundColor: "rgba(15, 23, 42, 0.4)",
     justifyContent: "center",
     alignItems: "center",
     padding: 24,
@@ -179,5 +165,94 @@ const styles = StyleSheet.create({
   container: {
     width: "100%",
     maxWidth: 400,
+    zIndex: 1,
+  },
+  card: {
+    backgroundColor: "#FAFBFD",
+    borderRadius: 22,
+    padding: 22,
+    zIndex: 1,
+  },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 18,
+  },
+  identity: {
+    flex: 1,
+    marginRight: 12,
+    minWidth: 0,
+  },
+  title: {
+    fontSize: 20,
+    color: INK,
+    letterSpacing: -0.4,
+  },
+  subtitle: {
+    marginTop: 3,
+    fontSize: 13,
+    color: MUTED,
+  },
+  close: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: "#EEF1F6",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  label: {
+    fontSize: 13,
+    color: MUTED,
+    marginBottom: 8,
+  },
+  field: {
+    flexDirection: "row",
+    alignItems: "center",
+    height: 52,
+    borderRadius: 14,
+    backgroundColor: "#EEF1F6",
+    paddingHorizontal: 14,
+  },
+  fieldWarn: {
+    backgroundColor: "#FDE6D4",
+  },
+  prefix: {
+    fontSize: 18,
+    color: MUTED,
+    marginRight: 8,
+  },
+  input: {
+    flex: 1,
+    fontSize: 18,
+    color: INK,
+  },
+  hintRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginTop: 10,
+    marginBottom: 18,
+  },
+  hint: {
+    fontSize: 12,
+    color: MUTED,
+  },
+  warn: {
+    fontSize: 12,
+    color: AMBER,
+  },
+  submit: {
+    height: 52,
+    borderRadius: 14,
+    backgroundColor: TINT,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  submitOff: {
+    backgroundColor: "#CBD5E1",
+  },
+  submitText: {
+    fontSize: 16,
+    color: "#FFFFFF",
   },
 });

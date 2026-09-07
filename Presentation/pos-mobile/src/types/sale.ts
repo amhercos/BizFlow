@@ -3,6 +3,11 @@ export enum PaymentType {
   Credit = 2,
 }
 
+export enum UnitType {
+  Piece = "Piece",
+  Pack = "Pack",
+}
+
 export interface CheckoutParams {
   paymentType: PaymentType;
   cashReceived?: number;
@@ -41,6 +46,10 @@ export interface BasketItem {
   quantity: number;
   unitPrice: number;
   stock: number;
+  unitType: UnitType;
+  piecesPerPack: number;
+  packPrice: number;
+  retailPrice: number;
   promotions?: AppliedPromotion[];
 }
 
@@ -50,6 +59,8 @@ export interface Product {
   price: number;
   stock: number;
   categoryName: string;
+  piecesPerPack: number;
+  packPrice: number;
   promotions?: AppliedPromotion[];
 }
 
@@ -57,7 +68,9 @@ export interface CreateTransactionCommand {
   items: {
     productId: string;
     quantity: number;
+    isPack: boolean;
     unitPrice: number;
+    subTotal: number;
   }[];
   paymentType: PaymentType;
   totalAmount: number;

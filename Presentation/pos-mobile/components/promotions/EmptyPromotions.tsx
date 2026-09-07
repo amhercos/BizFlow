@@ -1,19 +1,34 @@
-import { ZapOff } from "lucide-react-native";
+import { typeface, useInter } from "@/src/theme/typography";
 import React from "react";
-import { Text, View } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
 
-const EmptyPromotions = () => (
-  <View className="flex-1 items-center justify-center py-20">
-    <View className="bg-slate-100 p-6 rounded-full mb-4">
-      <ZapOff size={40} color="#94a3b8" />
+export default function EmptyPromotions() {
+  const font = useInter();
+
+  return (
+    <View style={styles.wrap}>
+      <Text style={[styles.title, typeface(font.semibold, "600")]}>
+        No deals yet
+      </Text>
+      <Text style={[styles.body, typeface(font.regular, "400")]}>
+        Tap + to add a discount, bulk, or bundle promo.
+      </Text>
     </View>
-    <Text className="text-slate-900 text-lg font-bold">
-      No Active Promotions
-    </Text>
-    <Text className="text-slate-500 text-center px-10 mt-2">
-      Tap the + button to create your first bulk deal or product bundle.
-    </Text>
-  </View>
-);
+  );
+}
 
-export default EmptyPromotions;
+const styles = StyleSheet.create({
+  wrap: {
+    paddingVertical: 36,
+  },
+  title: {
+    fontSize: 16,
+    color: "#0F172A",
+  },
+  body: {
+    marginTop: 6,
+    fontSize: 14,
+    color: "#64748B",
+    lineHeight: 20,
+  },
+});

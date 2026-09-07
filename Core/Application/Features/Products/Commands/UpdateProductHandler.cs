@@ -20,6 +20,8 @@ public class UpdateProductHandler(
         product.Name = request.Name;
         product.Description = request.Description;
         product.Price = request.Price;
+        product.PackPrice = request.PackPrice;
+        product.PiecesPerPack = request.PiecesPerPack;
         product.Stock = request.Stock;
         product.LowStockThreshold = request.LowStockThreshold;
         product.CategoryId = request.CategoryId;
@@ -35,11 +37,14 @@ public class UpdateProductHandler(
             updatedProduct.Name,
             updatedProduct.Description,
             updatedProduct.Price,
+            updatedProduct.PackPrice,
+            updatedProduct.PiecesPerPack,
             updatedProduct.Stock,
             updatedProduct.LowStockThreshold,
             updatedProduct.Category?.CategoryName ?? "General",
             updatedProduct.ExpiryDate,
-            updatedProduct.CategoryId
+            updatedProduct.CategoryId,
+            null
         );
     }
 }

@@ -30,8 +30,9 @@ export const promotionService = {
     showToast.success("Updated", "Promotion has been updated");
   },
 
-  toggle: async (id: string): Promise<void> => {
-    await apiClient.patch(`/Promotions/${id}/toggle`);
+  toggle: async (id: string): Promise<boolean> => {
+    const response = await apiClient.patch<boolean>(`/Promotions/${id}/toggle`);
+    return response.data;
   },
 
   delete: async (id: string): Promise<void> => {

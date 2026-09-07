@@ -29,6 +29,8 @@ public class CreateProductHandler(
             Name = request.Name,
             Description = request.Description,
             Price = request.Price,
+            PackPrice = request.PackPrice,
+            PiecesPerPack = request.PiecesPerPack,
             Stock = request.StockQuantity,
             ExpiryDate = request.ExpiryDate,
             LowStockThreshold = 5,
