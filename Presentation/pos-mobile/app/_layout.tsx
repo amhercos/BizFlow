@@ -3,7 +3,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useRouter, useSegments } from "expo-router";
 import { Drawer } from "expo-router/drawer";
 import { BarChart3, LogOut, Settings, Store } from "lucide-react-native";
-import React, { memo, useCallback, useEffect } from "react";
+import React, { useCallback, useEffect } from "react";
 import {
   ActivityIndicator,
   ScrollView,
@@ -22,8 +22,13 @@ import Toast from "react-native-toast-message";
 
 import "../global.css";
 import { AuthProvider, useAuth } from "../src/context/AuthContext";
+import { typeface, useInter } from "../src/theme/typography";
 import { NavigationBridge, setDrawerNavigation } from "../src/utils/drawerRef";
 import { showToast } from "../src/utils/toast";
+
+const INK = "#0F172A";
+const MUTED = "#64748B";
+const TINT = "#2563EB";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -34,36 +39,20 @@ const queryClient = new QueryClient({
   },
 });
 
-const SectionHeader = memo(({ title }: { title: string }) => (
-  <Text className="text-[10px] font-black text-slate-400 uppercase tracking-[2px] mb-3 px-2">
-    {title}
-  </Text>
-));
-SectionHeader.displayName = "SectionHeader";
-
-interface DrawerItemProps {
-  icon: React.ReactNode;
-  label: string;
-  onPress: () => void;
+function roleLabel(role?: string) {
+  if (role === "StoreOwner") return "Store owner";
+  if (role === "Cashier") return "Cashier";
+  if (role === "Admin") return "Admin";
+  return "Staff";
 }
-
-const DrawerItem = memo(({ icon, label, onPress }: DrawerItemProps) => (
-  <TouchableOpacity
-    onPress={onPress}
-    className="flex-row items-center p-4 rounded-2xl active:bg-slate-100"
-  >
-    {icon}
-    <Text className="ml-3 font-bold text-slate-700">{label}</Text>
-  </TouchableOpacity>
-));
-DrawerItem.displayName = "DrawerItem";
 
 function CustomDrawerContent(
   props: DrawerContentComponentProps,
 ): React.JSX.Element {
-  const { logout } = useAuth();
+  const { logout, user } = useAuth();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const font = useInter();
 
   useEffect(() => {
     const bridge: NavigationBridge = {
@@ -92,48 +81,74 @@ function CustomDrawerContent(
   );
 
   return (
-    <View style={[styles.flexOne, { paddingTop: Math.max(insets.top, 20) }]}>
+    <View
+      style={[
+        styles.drawer,
+        { paddingTop: insets.top + 10, paddingBottom: insets.bottom + 16 },
+      ]}
+    >
+      <View style={styles.brand}>
+        <View style={styles.brandMark}>
+          <Store size={18} color="#FFFFFF" strokeWidth={2.2} />
+        </View>
+        <View style={styles.brandCopy}>
+          <Text style={[styles.brandName, typeface(font.bold, "700")]}>
+            BizFlow
+          </Text>
+          <Text
+            style={[styles.brandMeta, typeface(font.medium, "500")]}
+            numberOfLines={1}
+          >
+            {user?.fullName || user?.userName || roleLabel(user?.role)}
+          </Text>
+        </View>
+      </View>
+
       <ScrollView
         contentContainerStyle={styles.drawerScroll}
         showsVerticalScrollIndicator={false}
       >
-        <View className="flex-row items-center gap-3 mb-8 px-2">
-          <View className="bg-blue-600 p-2 rounded-xl shadow-sm">
-            <Store color="white" size={24} />
-          </View>
-          <Text className="text-xl font-bold text-slate-900 tracking-tight">
-            BizFlow
+        <Text style={[styles.section, typeface(font.bold, "700")]}>
+          Management
+        </Text>
+        <TouchableOpacity
+          onPress={() => navigateTo("/(tabs)/reports")}
+          style={styles.row}
+          accessibilityLabel="Analytics"
+        >
+          <BarChart3 size={20} color={MUTED} strokeWidth={1.8} />
+          <Text style={[styles.rowLabel, typeface(font.semibold, "600")]}>
+            Analytics
           </Text>
-        </View>
+        </TouchableOpacity>
 
-        <SectionHeader title="Management" />
-        <View className="gap-y-1 mb-8">
-          <DrawerItem
-            icon={<BarChart3 size={20} color="#64748b" />}
-            label="Analytics"
-            onPress={() => navigateTo("/(tabs)/reports")}
-          />
-        </View>
-
-        <SectionHeader title="Account" />
-        <View className="gap-y-1">
-          <DrawerItem
-            icon={<Settings size={20} color="#64748b" />}
-            label="Settings"
-            onPress={() => navigateTo("/(tabs)/settings")}
-          />
-        </View>
-
-        <View className="mt-auto pt-6 border-t border-slate-100">
-          <TouchableOpacity
-            onPress={handleLogout}
-            className="flex-row items-center p-4 rounded-2xl bg-rose-50 active:bg-rose-100"
-          >
-            <LogOut size={20} color="#e11d48" />
-            <Text className="ml-3 font-bold text-rose-600">Logout</Text>
-          </TouchableOpacity>
-        </View>
+        <Text style={[styles.section, typeface(font.bold, "700")]}>
+          Account
+        </Text>
+        <TouchableOpacity
+          onPress={() => navigateTo("/(tabs)/settings")}
+          style={styles.row}
+          accessibilityLabel="Settings"
+        >
+          <Settings size={20} color={MUTED} strokeWidth={1.8} />
+          <Text style={[styles.rowLabel, typeface(font.semibold, "600")]}>
+            Settings
+          </Text>
+        </TouchableOpacity>
       </ScrollView>
+
+      <TouchableOpacity
+        onPress={() => {
+          void handleLogout();
+        }}
+        style={styles.logout}
+        accessibilityLabel="Logout"
+      >
+        <LogOut size={20} color="#E11D48" strokeWidth={1.8} />
+        <Text style={[styles.logoutText, typeface(font.semibold, "600")]}>
+          Logout
+        </Text>
+      </TouchableOpacity>
     </View>
   );
 }
@@ -159,7 +174,7 @@ function RootLayoutNav(): React.JSX.Element {
   if (isLoading) {
     return (
       <View style={styles.centered}>
-        <ActivityIndicator size="large" color="#2563eb" />
+        <ActivityIndicator size="large" color={TINT} />
       </View>
     );
   }
@@ -173,9 +188,12 @@ function RootLayoutNav(): React.JSX.Element {
         screenOptions={{
           headerShown: false,
           drawerType: "front",
-          drawerStyle: { width: isLargeScreen ? 300 : "80%" },
-          overlayColor: "rgba(0, 0, 0, 0.4)",
-          sceneStyle: { backgroundColor: "#ffffff" },
+          drawerStyle: {
+            width: isLargeScreen ? 300 : "80%",
+            backgroundColor: "#FAFBFD",
+          },
+          overlayColor: "rgba(15, 23, 42, 0.4)",
+          sceneStyle: { backgroundColor: "#FAFBFD" },
         }}
       >
         <Drawer.Screen
@@ -208,16 +226,78 @@ export default function RootLayout(): React.JSX.Element {
 }
 
 const styles = StyleSheet.create({
-  flexOne: { flex: 1, backgroundColor: "white" },
+  flexOne: { flex: 1, backgroundColor: "#FAFBFD" },
   centered: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "white",
+    backgroundColor: "#FAFBFD",
+  },
+  drawer: {
+    flex: 1,
+    backgroundColor: "#FAFBFD",
+    paddingHorizontal: 18,
+  },
+  brand: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 8,
+    marginBottom: 12,
+  },
+  brandMark: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: TINT,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  brandCopy: {
+    flex: 1,
+    marginLeft: 12,
+    minWidth: 0,
+  },
+  brandName: {
+    fontSize: 17,
+    color: INK,
+    letterSpacing: -0.3,
+  },
+  brandMeta: {
+    marginTop: 2,
+    fontSize: 13,
+    color: MUTED,
   },
   drawerScroll: {
-    flexGrow: 1,
-    paddingBottom: 40,
-    paddingHorizontal: 16,
+    paddingBottom: 16,
+  },
+  section: {
+    marginTop: 22,
+    marginBottom: 4,
+    fontSize: 13,
+    color: INK,
+    letterSpacing: 0.8,
+    textTransform: "uppercase",
+  },
+  row: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 12,
+    gap: 12,
+  },
+  rowLabel: {
+    flex: 1,
+    fontSize: 16,
+    color: INK,
+  },
+  logout: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingVertical: 12,
+    marginTop: 8,
+  },
+  logoutText: {
+    fontSize: 15,
+    color: "#E11D48",
   },
 });

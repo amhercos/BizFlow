@@ -1,17 +1,26 @@
-import { cn } from "@/src/lib/utils";
+import { formatPHP } from "@/src/lib/math";
+import { typeface, useInter } from "@/src/theme/typography";
 import type { TransactionDetails, TransactionItem } from "@/src/types/record";
 import { format } from "date-fns";
-import {
-  Calendar,
-  CreditCard,
-  ReceiptText,
-  User,
-  X,
-} from "lucide-react-native";
-import { Skeleton } from "moti/skeleton"; // Added for skeleton
+import { X } from "lucide-react-native";
+import { Skeleton } from "moti/skeleton";
 import React from "react";
-import { Modal, ScrollView, Text, TouchableOpacity, View } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import {
+  Modal,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+
+const INK = "#0F172A";
+const MUTED = "#64748B";
+const TINT = "#2563EB";
+const GREEN = "#15803D";
+const LINE = "rgba(15, 23, 42, 0.08)";
 
 interface ReceiptModalProps {
   data: TransactionDetails | null;
@@ -19,227 +28,339 @@ interface ReceiptModalProps {
   onClose: () => void;
 }
 
-interface MetaRowProps {
-  icon: React.ReactNode;
-  label: string;
-  value: string | undefined;
-  isBadge?: boolean;
-}
-
 export function ReceiptModal({ data, visible, onClose }: ReceiptModalProps) {
-  const formatPHP = (val: number) =>
-    `₱${val.toLocaleString("en-PH", { minimumFractionDigits: 2 })}`;
+  const insets = useSafeAreaInsets();
+  const font = useInter();
+  const isCash = data?.paymentType === "Cash";
 
   return (
     <Modal
       visible={visible}
       animationType="slide"
-      transparent={true}
+      transparent
       onRequestClose={onClose}
     >
-      <View className="flex-1 bg-black/40 justify-end">
-        <SafeAreaView
-          className="bg-white rounded-t-[40px] h-[90%] shadow-2xl"
-          edges={["bottom"]}
+      <View style={styles.backdrop}>
+        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
+        <View
+          style={[
+            styles.sheet,
+            { paddingBottom: Math.max(insets.bottom, 16) },
+          ]}
         >
-          {/* Top Indicator */}
-          <View className="items-center py-4">
-            <View className="w-12 h-1.5 bg-slate-200 rounded-full" />
-          </View>
-
-          {/* Header */}
-          <View className="flex-row justify-between items-center px-8 mb-6">
-            <Text className="text-2xl font-black text-slate-950 tracking-tighter">
-              Receipt
-            </Text>
+          <View style={styles.header}>
+            <View style={styles.identity}>
+              <Text style={[styles.title, typeface(font.bold, "700")]}>
+                Receipt
+              </Text>
+              <Text style={[styles.subtitle, typeface(font.medium, "500")]}>
+                {data ? data.id.slice(-12).toUpperCase() : "Loading"}
+              </Text>
+            </View>
             <TouchableOpacity
               onPress={onClose}
-              className="bg-slate-100 p-2 rounded-full"
+              style={styles.close}
+              accessibilityLabel="Close receipt"
             >
-              <X size={20} color="#64748b" />
+              <X size={18} color={INK} />
             </TouchableOpacity>
           </View>
 
           {!data ? (
-            // Subtle Skeleton Loader matching receipt structure
-            <View className="flex-1 px-8">
-              <Skeleton.Group show={true}>
-                <View className="items-center mb-8 gap-y-2">
-                  <Skeleton
-                    colorMode="light"
-                    radius="round"
-                    height={64}
-                    width={64}
-                  />
-                  <Skeleton colorMode="light" width={100} height={12} />
-                  <Skeleton colorMode="light" width={150} height={16} />
-                </View>
-
-                <View className="bg-slate-50/50 border border-slate-100 rounded-3xl p-5 mb-6 gap-y-4">
-                  <View className="flex-row justify-between">
-                    <Skeleton colorMode="light" width={80} height={12} />
-                    <Skeleton colorMode="light" width={120} height={12} />
-                  </View>
-                  <View className="flex-row justify-between">
-                    <Skeleton colorMode="light" width={80} height={12} />
-                    <Skeleton colorMode="light" width={100} height={12} />
-                  </View>
-                  <View className="flex-row justify-between">
-                    <Skeleton colorMode="light" width={80} height={12} />
-                    <Skeleton colorMode="light" width={60} height={12} />
-                  </View>
-                </View>
-
-                <Skeleton
-                  colorMode="light"
-                  width={120}
-                  height={10}
-                  radius={4}
-                />
-                <View className="mt-3 border border-slate-100 rounded-[32px] overflow-hidden mb-6">
-                  {[1, 2].map((i) => (
-                    <View
-                      key={i}
-                      className="flex-row justify-between p-5 border-b border-slate-50 bg-white"
-                    >
-                      <View className="gap-y-2">
-                        <Skeleton colorMode="light" width={120} height={14} />
-                        <Skeleton colorMode="light" width={80} height={10} />
-                      </View>
-                      <Skeleton colorMode="light" width={60} height={16} />
-                    </View>
-                  ))}
-                </View>
-              </Skeleton.Group>
+            <View style={styles.body}>
+              <Skeleton colorMode="light" width="100%" height={72} radius={16} />
+              <View style={{ height: 14 }} />
+              <Skeleton colorMode="light" width="100%" height={88} radius={16} />
+              <View style={{ height: 14 }} />
+              <Skeleton
+                colorMode="light"
+                width="100%"
+                height={120}
+                radius={16}
+              />
             </View>
           ) : (
             <ScrollView
-              className="flex-1 px-8"
+              contentContainerStyle={styles.body}
               showsVerticalScrollIndicator={false}
             >
-              <View className="items-center mb-8">
-                <View className="bg-blue-50 p-4 rounded-full mb-3">
-                  <ReceiptText size={32} color="#2563eb" />
-                </View>
-                <Text className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                  Reference ID
-                </Text>
-                <Text className="text-sm font-bold text-slate-700 font-mono uppercase">
-                  {data.id.slice(-12)}
-                </Text>
-              </View>
-
-              <View className="bg-slate-50/50 border border-slate-100 rounded-3xl p-5 mb-6">
-                <MetaRow
-                  icon={<Calendar size={14} color="#94a3b8" />}
+              <View style={styles.meta}>
+                <MetaLine
                   label="Date"
                   value={format(
                     new Date(data.transactionDate),
                     "MMM dd, yyyy • hh:mm aa",
                   )}
                 />
-                <MetaRow
-                  icon={<User size={14} color="#94a3b8" />}
-                  label="Cashier"
-                  value={data.userName}
-                />
-                <MetaRow
-                  icon={<CreditCard size={14} color="#94a3b8" />}
-                  label="Method"
-                  value={data.paymentType}
-                  isBadge
-                />
+                <View style={styles.hairline} />
+                <MetaLine label="Cashier" value={data.userName || "N/A"} />
+                <View style={styles.hairline} />
+                <View style={styles.metaRow}>
+                  <Text style={[styles.metaLabel, typeface(font.medium, "500")]}>
+                    Method
+                  </Text>
+                  <View
+                    style={[
+                      styles.pill,
+                      {
+                        backgroundColor: isCash ? "#E7F8EE" : "#DCEBFF",
+                      },
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.pillText,
+                        { color: isCash ? GREEN : TINT },
+                        typeface(font.medium, "500"),
+                      ]}
+                    >
+                      {data.paymentType}
+                    </Text>
+                  </View>
+                </View>
               </View>
 
-              <Text className="text-[10px] font-black text-slate-400 uppercase tracking-[2px] mb-3 ml-2">
-                Items Breakdown
+              <Text style={[styles.section, typeface(font.bold, "700")]}>
+                Items
               </Text>
-              <View className="border border-slate-100 rounded-[32px] overflow-hidden mb-6">
+              <View style={styles.list}>
                 {data.items.map((item: TransactionItem, index: number) => (
-                  <View
-                    key={index}
-                    className="flex-row justify-between p-5 border-b border-slate-50 bg-white"
-                  >
-                    <View className="flex-1">
-                      <Text className="text-sm font-bold text-slate-900">
-                        {item.productName}
-                      </Text>
-                      <Text className="text-[10px] font-bold text-slate-400">
-                        {item.quantity} x {formatPHP(item.unitPrice)}
+                  <View key={`${item.productName}-${index}`}>
+                    {index > 0 ? <View style={styles.hairline} /> : null}
+                    <View style={styles.itemRow}>
+                      <View style={styles.itemBody}>
+                        <Text
+                          style={[styles.itemName, typeface(font.semibold, "600")]}
+                          numberOfLines={1}
+                        >
+                          {item.productName}
+                        </Text>
+                        <Text
+                          style={[styles.itemMeta, typeface(font.medium, "500")]}
+                        >
+                          {item.quantity} × {formatPHP(item.unitPrice)}
+                        </Text>
+                      </View>
+                      <Text
+                        style={[styles.itemAmount, typeface(font.semibold, "600")]}
+                      >
+                        {formatPHP(item.subTotal)}
                       </Text>
                     </View>
-                    <Text className="text-sm font-black text-slate-950">
-                      {formatPHP(item.subTotal)}
-                    </Text>
                   </View>
                 ))}
               </View>
 
-              <View className="bg-slate-950 rounded-[32px] p-8 mb-10 shadow-lg">
-                <View className="flex-row justify-between items-center mb-4">
-                  <Text className="text-slate-400 text-[10px] font-black uppercase tracking-widest">
-                    Total Amount
+              <View style={styles.totals}>
+                <View style={styles.totalRow}>
+                  <Text style={[styles.totalLabel, typeface(font.medium, "500")]}>
+                    Total
                   </Text>
-                  <Text className="text-white text-2xl font-black">
+                  <Text style={[styles.totalValue, typeface(font.bold, "700")]}>
                     {formatPHP(data.totalAmount)}
                   </Text>
                 </View>
-                <View className="h-px bg-slate-800 w-full mb-4" />
-                <View className="flex-row justify-between items-center mb-2">
-                  <Text className="text-slate-500 text-[10px] font-bold">
-                    Cash Received
-                  </Text>
-                  <Text className="text-slate-300 text-xs font-bold">
-                    {formatPHP(data.cashReceived)}
-                  </Text>
-                </View>
-                <View className="flex-row justify-between items-center">
-                  <Text className="text-blue-400 text-[10px] font-black uppercase tracking-widest">
-                    Change
-                  </Text>
-                  <Text className="text-blue-400 text-2xl font-black">
-                    {formatPHP(data.changeAmount)}
-                  </Text>
-                </View>
+                {isCash ? (
+                  <>
+                    <View style={styles.hairline} />
+                    <View style={styles.totalRow}>
+                      <Text
+                        style={[styles.metaLabel, typeface(font.medium, "500")]}
+                      >
+                        Cash received
+                      </Text>
+                      <Text
+                        style={[styles.cashValue, typeface(font.semibold, "600")]}
+                      >
+                        {formatPHP(data.cashReceived)}
+                      </Text>
+                    </View>
+                    <View style={styles.totalRow}>
+                      <Text
+                        style={[styles.metaLabel, typeface(font.medium, "500")]}
+                      >
+                        Change
+                      </Text>
+                      <Text
+                        style={[styles.changeValue, typeface(font.bold, "700")]}
+                      >
+                        {formatPHP(data.changeAmount)}
+                      </Text>
+                    </View>
+                  </>
+                ) : null}
               </View>
             </ScrollView>
           )}
-        </SafeAreaView>
+        </View>
       </View>
     </Modal>
   );
 }
 
-function MetaRow({ icon, label, value, isBadge }: MetaRowProps) {
+function MetaLine({ label, value }: { label: string; value: string }) {
+  const font = useInter();
   return (
-    <View className="flex-row items-center justify-between py-2">
-      <View className="flex-row items-center">
-        {icon}
-        <Text className="ml-2 text-[10px] font-black text-slate-400 uppercase tracking-wider">
-          {label}
-        </Text>
-      </View>
-      {isBadge ? (
-        <View
-          className={cn(
-            "px-2 py-0.5 rounded-lg",
-            value === "Cash" ? "bg-emerald-100" : "bg-blue-100",
-          )}
-        >
-          <Text
-            className={cn(
-              "text-[9px] font-black uppercase",
-              value === "Cash" ? "text-emerald-700" : "text-blue-700",
-            )}
-          >
-            {value}
-          </Text>
-        </View>
-      ) : (
-        <Text className="text-xs font-bold text-slate-700">
-          {value ?? "N/A"}
-        </Text>
-      )}
+    <View style={styles.metaRow}>
+      <Text style={[styles.metaLabel, typeface(font.medium, "500")]}>
+        {label}
+      </Text>
+      <Text style={[styles.metaValue, typeface(font.semibold, "600")]}>
+        {value}
+      </Text>
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  backdrop: {
+    flex: 1,
+    justifyContent: "flex-end",
+    backgroundColor: "rgba(15, 23, 42, 0.4)",
+  },
+  sheet: {
+    backgroundColor: "#FAFBFD",
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    maxHeight: "92%",
+  },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 22,
+    paddingTop: 20,
+    paddingBottom: 12,
+  },
+  identity: {
+    flex: 1,
+  },
+  title: {
+    fontSize: 20,
+    color: INK,
+    letterSpacing: -0.4,
+  },
+  subtitle: {
+    marginTop: 3,
+    fontSize: 13,
+    color: MUTED,
+  },
+  close: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: "#EEF1F6",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  body: {
+    paddingHorizontal: 22,
+    paddingBottom: 24,
+  },
+  meta: {
+    backgroundColor: "#F4F6FA",
+    borderRadius: 16,
+    paddingHorizontal: 14,
+    paddingVertical: 4,
+  },
+  metaRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: 12,
+  },
+  metaLabel: {
+    fontSize: 13,
+    color: MUTED,
+  },
+  metaValue: {
+    fontSize: 13,
+    color: INK,
+    flexShrink: 1,
+    marginLeft: 12,
+    textAlign: "right",
+  },
+  pill: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 999,
+  },
+  pillText: {
+    fontSize: 12,
+  },
+  section: {
+    marginTop: 22,
+    marginBottom: 8,
+    fontSize: 13,
+    color: INK,
+    letterSpacing: 0.8,
+    textTransform: "uppercase",
+  },
+  list: {
+    backgroundColor: "#F4F6FA",
+    borderRadius: 16,
+    overflow: "hidden",
+  },
+  itemRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+  },
+  itemBody: {
+    flex: 1,
+    marginRight: 12,
+    minWidth: 0,
+  },
+  itemName: {
+    fontSize: 15,
+    color: INK,
+  },
+  itemMeta: {
+    marginTop: 3,
+    fontSize: 12,
+    color: MUTED,
+  },
+  itemAmount: {
+    fontSize: 15,
+    color: TINT,
+    fontVariant: ["tabular-nums"],
+  },
+  hairline: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: LINE,
+    marginLeft: 14,
+  },
+  totals: {
+    marginTop: 16,
+    backgroundColor: "#F3F7FF",
+    borderRadius: 16,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+  },
+  totalRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: 10,
+  },
+  totalLabel: {
+    fontSize: 13,
+    color: MUTED,
+  },
+  totalValue: {
+    fontSize: 22,
+    color: TINT,
+    letterSpacing: -0.4,
+    fontVariant: ["tabular-nums"],
+  },
+  cashValue: {
+    fontSize: 15,
+    color: INK,
+    fontVariant: ["tabular-nums"],
+  },
+  changeValue: {
+    fontSize: 18,
+    color: TINT,
+    fontVariant: ["tabular-nums"],
+  },
+});

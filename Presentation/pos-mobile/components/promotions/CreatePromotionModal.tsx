@@ -1,27 +1,26 @@
-import { cn } from "@/src/lib/utils";
+import { typeface, useInter } from "@/src/theme/typography";
+import type { Product } from "@/src/types/inventory";
 import {
-  ArrowRight,
   Check,
-  Layers,
-  Package,
-  Plus,
   Search,
-  Tag,
   Trash2,
   X,
 } from "lucide-react-native";
-import React, { FC, useMemo, useState } from "react";
+import React, { useMemo, useState } from "react";
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
   Modal,
   Platform,
+  Pressable,
   ScrollView,
+  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useInventory } from "../../src/hooks/use-inventory";
 import { usePromotions } from "../../src/hooks/use-promotions";
 import {
@@ -30,6 +29,11 @@ import {
   PromotionType,
 } from "../../src/types/promotion";
 
+const INK = "#0F172A";
+const MUTED = "#64748B";
+const TINT = "#2563EB";
+const LINE = "rgba(15, 23, 42, 0.08)";
+
 interface CreatePromotionModalProps {
   isVisible: boolean;
   onClose: () => void;
@@ -37,39 +41,43 @@ interface CreatePromotionModalProps {
 
 type TierInput = Omit<PromotionTier, "id" | "promotionId">;
 
-interface StrategyOption {
-  id: PromotionType;
-  label: string;
-  icon: FC<{ size: number; color: string }>;
-}
-
-const STRATEGIES: StrategyOption[] = [
-  { id: PromotionType.Bulk, label: "Bulk", icon: Package },
-  { id: PromotionType.Bundle, label: "Bundle", icon: Layers },
-  { id: PromotionType.Discount, label: "Discount", icon: Tag },
+const STRATEGIES: { id: PromotionType; label: string; hint: string }[] = [
+  { id: PromotionType.Discount, label: "Discount", hint: "One promo price" },
+  { id: PromotionType.Bulk, label: "Bulk", hint: "Quantity breaks" },
+  { id: PromotionType.Bundle, label: "Bundle", hint: "Buy with another item" },
 ];
 
 export default function CreatePromotionModal({
   isVisible,
   onClose,
 }: CreatePromotionModalProps) {
+  const insets = useSafeAreaInsets();
+  const font = useInter();
   const { addPromotion, isProcessing } = usePromotions();
   const { products } = useInventory();
 
-  const [type, setType] = useState<PromotionType>(PromotionType.Bulk);
-  const [name, setName] = useState<string>("");
-  const [selectedProductId, setSelectedProductId] = useState<string>("");
-  const [productSearch, setProductSearch] = useState<string>("");
-
+  const [type, setType] = useState<PromotionType>(PromotionType.Discount);
+  const [name, setName] = useState("");
+  const [selectedProductId, setSelectedProductId] = useState("");
+  const [productSearch, setProductSearch] = useState("");
   const [tieUpProductId, setTieUpProductId] = useState<string | null>(null);
-  const [tieUpSearch, setTieUpSearch] = useState<string>("");
-  const [tieUpQuantity, setTieUpQuantity] = useState<number>(1);
-
+  const [tieUpSearch, setTieUpSearch] = useState("");
+  const [tieUpQuantity] = useState(1);
   const [tiers, setTiers] = useState<TierInput[]>([{ quantity: 1, price: 0 }]);
 
   const isBulk = type === PromotionType.Bulk;
   const isBundle = type === PromotionType.Bundle;
   const isDiscount = type === PromotionType.Discount;
+  const hint = STRATEGIES.find((item) => item.id === type)?.hint ?? "";
+
+  const reset = () => {
+    setName("");
+    setSelectedProductId("");
+    setProductSearch("");
+    setTieUpProductId(null);
+    setTieUpSearch("");
+    setTiers([{ quantity: 1, price: 0 }]);
+  };
 
   const updateTier = (index: number, field: keyof TierInput, value: string) => {
     const cleaned = value.replace(/[^0-9.]/g, "");
@@ -81,19 +89,24 @@ export default function CreatePromotionModal({
     });
   };
 
+  const canSave =
+    name.trim().length > 0 &&
+    selectedProductId.length > 0 &&
+    tiers[0].price > 0 &&
+    (!isBundle || !!tieUpProductId);
+
   const handleSubmit = () => {
-    if (!name || !selectedProductId || tiers[0].price <= 0) return;
-    if (isBundle && (!tieUpProductId || tieUpQuantity < 1)) return;
+    if (!canSave) return;
 
     const payload: CreatePromotionRequest = {
-      name,
-      type: PromotionType[type] as unknown as string,
+      name: name.trim(),
+      type,
       mainProductId: selectedProductId,
       isActive: true,
       tiers: (isBulk ? tiers : [{ quantity: 1, price: tiers[0].price }]).map(
-        (t) => ({
-          quantity: t.quantity,
-          price: t.price,
+        (tier) => ({
+          quantity: tier.quantity,
+          price: tier.price,
         }),
       ),
       tieUpProductId: isBundle ? tieUpProductId : null,
@@ -102,13 +115,7 @@ export default function CreatePromotionModal({
 
     addPromotion(payload, {
       onSuccess: () => {
-        setName("");
-        setSelectedProductId("");
-        setProductSearch("");
-        setTieUpProductId(null);
-        setTieUpSearch("");
-        setTieUpQuantity(1);
-        setTiers([{ quantity: 1, price: 0 }]);
+        reset();
         onClose();
       },
     });
@@ -117,312 +124,245 @@ export default function CreatePromotionModal({
   const filteredMainProducts = useMemo(
     () =>
       products
-        ?.filter((p) =>
-          p.name.toLowerCase().includes(productSearch.toLowerCase()),
+        ?.filter((item) =>
+          item.name.toLowerCase().includes(productSearch.toLowerCase()),
         )
-        .slice(0, 3),
+        .slice(0, 6) ?? [],
     [products, productSearch],
   );
 
   const filteredTieUpProducts = useMemo(
     () =>
       products
-        ?.filter((p) =>
-          p.name.toLowerCase().includes(tieUpSearch.toLowerCase()),
+        ?.filter((item) =>
+          item.name.toLowerCase().includes(tieUpSearch.toLowerCase()),
         )
-        .slice(0, 3),
+        .slice(0, 6) ?? [],
     [products, tieUpSearch],
   );
 
   return (
-    <Modal visible={isVisible} animationType="slide" transparent>
+    <Modal
+      visible={isVisible}
+      animationType="slide"
+      transparent
+      onRequestClose={onClose}
+    >
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : "height"}
-        className="flex-1 justify-end bg-slate-900/50"
+        style={styles.backdrop}
       >
-        <View className="bg-white rounded-t-[40px] h-[85%] shadow-2xl">
-          {/* HEADER */}
-          <View className="px-6 pt-7 pb-2 flex-row justify-between items-center">
-            <Text className="text-2xl font-black text-slate-900 tracking-tight">
-              New Promotion
-            </Text>
-            <TouchableOpacity
-              onPress={onClose}
-              className="w-9 h-9 bg-slate-100 rounded-full items-center justify-center"
-            >
-              <X size={18} color="#475569" />
+        <View
+          style={[
+            styles.sheet,
+            { paddingBottom: Math.max(insets.bottom, 16) },
+          ]}
+        >
+          <View style={styles.header}>
+            <View style={styles.identity}>
+              <Text style={[styles.title, typeface(font.bold, "700")]}>
+                New promo
+              </Text>
+              <Text style={[styles.subtitle, typeface(font.medium, "500")]}>
+                {hint}
+              </Text>
+            </View>
+            <TouchableOpacity onPress={onClose} style={styles.close} hitSlop={8}>
+              <X size={18} color={INK} />
             </TouchableOpacity>
           </View>
 
           <ScrollView
             showsVerticalScrollIndicator={false}
-            className="flex-1 px-6"
             keyboardShouldPersistTaps="handled"
+            contentContainerStyle={styles.body}
           >
-            {/* TYPE SWITCHER */}
-            <View className="flex-row gap-2 my-4">
-              {STRATEGIES.map((s) => (
-                <TouchableOpacity
-                  key={s.id}
-                  onPress={() => {
-                    setType(s.id);
-                    setTiers([{ quantity: 1, price: 0 }]);
-                  }}
-                  className={cn(
-                    "flex-1 flex-row items-center justify-center py-3 rounded-xl border",
-                    type === s.id
-                      ? "border-blue-600 bg-blue-50/60"
-                      : "border-slate-100 bg-white",
-                  )}
-                >
-                  <s.icon
-                    size={14}
-                    color={type === s.id ? "#2563eb" : "#64748b"}
-                  />
-                  <Text
-                    className={cn(
-                      "ml-2 text-xs font-bold",
-                      type === s.id ? "text-blue-700" : "text-slate-500",
-                    )}
+            <View style={styles.segment}>
+              {STRATEGIES.map((item) => {
+                const active = type === item.id;
+                return (
+                  <Pressable
+                    key={item.id}
+                    onPress={() => {
+                      setType(item.id);
+                      setTiers([{ quantity: 1, price: 0 }]);
+                    }}
+                    style={[styles.segmentItem, active && styles.segmentItemOn]}
                   >
-                    {s.label}
-                  </Text>
-                </TouchableOpacity>
-              ))}
+                    <Text
+                      style={[
+                        styles.segmentText,
+                        active && styles.segmentTextOn,
+                        typeface(active ? font.semibold : font.medium, "600"),
+                      ]}
+                    >
+                      {item.label}
+                    </Text>
+                  </Pressable>
+                );
+              })}
             </View>
 
-            <View className="gap-y-4 pt-1">
-              {/* PROMO TITLE */}
-              <View>
-                <Text className="text-xs font-bold text-slate-900 mb-1.5 ml-1">
-                  Promo Title
-                </Text>
-                <TextInput
-                  placeholder="eg. Year End Promo, etc."
-                  className="bg-slate-50 p-4 rounded-xl font-medium text-slate-900 border border-slate-100 text-sm"
-                  value={name}
-                  onChangeText={setName}
+            <Field label="Name" font={font}>
+              <TextInput
+                placeholder="Weekend deal"
+                placeholderTextColor="#94A3B8"
+                value={name}
+                onChangeText={setName}
+                style={[styles.input, typeface(font.medium, "500")]}
+              />
+            </Field>
+
+            {isBundle ? (
+              <>
+                <ProductPicker
+                  label="Pair with"
+                  placeholder="Search required item"
+                  query={tieUpSearch}
+                  selectedId={tieUpProductId}
+                  results={filteredTieUpProducts}
+                  onChangeQuery={(value) => {
+                    setTieUpSearch(value);
+                    if (tieUpProductId) setTieUpProductId(null);
+                  }}
+                  onSelect={(item) => {
+                    setTieUpProductId(item.id);
+                    setTieUpSearch(item.name);
+                  }}
+                  onClear={() => {
+                    setTieUpProductId(null);
+                    setTieUpSearch("");
+                  }}
+                  font={font}
                 />
-              </View>
+                <ProductPicker
+                  label="Discounted item"
+                  placeholder="Search item on promo"
+                  query={productSearch}
+                  selectedId={selectedProductId}
+                  results={filteredMainProducts}
+                  onChangeQuery={(value) => {
+                    setProductSearch(value);
+                    if (selectedProductId) setSelectedProductId("");
+                  }}
+                  onSelect={(item) => {
+                    setSelectedProductId(item.id);
+                    setProductSearch(item.name);
+                  }}
+                  onClear={() => {
+                    setSelectedProductId("");
+                    setProductSearch("");
+                  }}
+                  font={font}
+                />
+              </>
+            ) : (
+              <ProductPicker
+                label="Product"
+                placeholder="Search items"
+                query={productSearch}
+                selectedId={selectedProductId}
+                results={filteredMainProducts}
+                onChangeQuery={(value) => {
+                  setProductSearch(value);
+                  if (selectedProductId) setSelectedProductId("");
+                }}
+                onSelect={(item) => {
+                  setSelectedProductId(item.id);
+                  setProductSearch(item.name);
+                }}
+                onClear={() => {
+                  setSelectedProductId("");
+                  setProductSearch("");
+                }}
+                font={font}
+              />
+            )}
 
-              {/* DYNAMIC FORM WORKFLOWS */}
-              {isBundle ? (
-                <View className="bg-amber-50/40 border border-amber-200/60 p-4 rounded-2xl gap-y-3">
-                  {/* CONDITION PRODUCT (TIE-UP) */}
-                  <View>
-                    <Text className="text-xs font-bold text-amber-900 mb-1.5 ml-1">
-                      Primary Producteg.
-                    </Text>
-                    <View className="bg-white flex-row items-center px-3 rounded-xl border border-amber-200/70">
-                      <Search size={14} color="#b45309" />
-                      <TextInput
-                        placeholder="Search required pairing product..."
-                        className="flex-1 p-3.5 font-medium text-slate-900 text-xs"
-                        value={tieUpSearch}
-                        onChangeText={(val) => {
-                          setTieUpSearch(val);
-                          if (tieUpProductId) setTieUpProductId(null);
-                        }}
-                      />
-                    </View>
-
-                    {!tieUpProductId && tieUpSearch.length > 0 && (
-                      <View className="bg-white border border-amber-100 rounded-xl mt-1 shadow-md z-10">
-                        {filteredTieUpProducts?.map((p) => (
-                          <TouchableOpacity
-                            key={p.id}
-                            onPress={() => {
-                              setTieUpProductId(p.id);
-                              setTieUpSearch(p.name);
-                              setTieUpQuantity(1); // Set to 1 explicitly for 1-to-1 backend matching
-                            }}
-                            className="p-3 border-b border-slate-50"
-                          >
-                            <Text className="font-bold text-slate-700 text-xs">
-                              {p.name}
-                            </Text>
-                          </TouchableOpacity>
-                        ))}
-                      </View>
-                    )}
-                  </View>
-
-                  {/* CONNECTIVE FLOW ARROW */}
-                  <View className="align-center items-center py-0.5">
-                    <ArrowRight size={14} color="#d97706" />
-                  </View>
-
-                  {/* TARGET PRODUCT (MAIN PRODUCT) */}
-                  <View>
-                    <Text className="text-xs font-bold text-amber-900 mb-1.5 ml-1">
-                      Tie -Up Product
-                    </Text>
-                    <View className="bg-white flex-row items-center px-3 rounded-xl border border-amber-200/70">
-                      <Search size={14} color="#b45309" />
-                      <TextInput
-                        placeholder="Search product to receive discount..."
-                        className="flex-1 p-3.5 font-medium text-slate-900 text-xs"
-                        value={productSearch}
-                        onChangeText={(val) => {
-                          setProductSearch(val);
-                          if (selectedProductId) setSelectedProductId("");
-                        }}
-                      />
-                    </View>
-                    {!selectedProductId && productSearch.length > 0 && (
-                      <View className="bg-white border border-amber-100 rounded-xl mt-1 shadow-md z-10">
-                        {filteredMainProducts?.map((p) => (
-                          <TouchableOpacity
-                            key={p.id}
-                            onPress={() => {
-                              setSelectedProductId(p.id);
-                              setProductSearch(p.name);
-                            }}
-                            className="p-3 border-b border-slate-50"
-                          >
-                            <Text className="font-bold text-slate-700 text-xs">
-                              {p.name}
-                            </Text>
-                          </TouchableOpacity>
-                        ))}
-                      </View>
-                    )}
-                  </View>
-                </View>
-              ) : (
-                /* STANDARD SELECT FOR BULK AND DISCOUNT */
-                <View>
-                  <Text className="text-xs font-bold text-slate-900 mb-1.5 ml-1">
-                    Select Product
+            <View style={styles.priceHead}>
+              <Text style={[styles.label, typeface(font.medium, "500")]}>
+                {isBulk ? "Price breaks" : "Promo price"}
+              </Text>
+              {isBulk ? (
+                <Pressable
+                  onPress={() =>
+                    setTiers((prev) => [...prev, { quantity: 1, price: 0 }])
+                  }
+                  hitSlop={6}
+                >
+                  <Text style={[styles.link, typeface(font.medium, "500")]}>
+                    Add tier
                   </Text>
-                  <View className="bg-slate-50 flex-row items-center px-3 rounded-xl border border-slate-100">
-                    <Search size={14} color="#94a3b8" />
+                </Pressable>
+              ) : null}
+            </View>
+
+            {tiers.map((tier, index) => (
+              <View key={index} style={styles.tierRow}>
+                {isBulk ? (
+                  <View style={styles.qtyField}>
+                    <Text style={[styles.fieldHint, typeface(font.medium, "500")]}>
+                      Qty
+                    </Text>
                     <TextInput
-                      placeholder="Search items..."
-                      className="flex-1 p-4 font-medium text-slate-900 text-sm"
-                      value={productSearch}
-                      onChangeText={(val) => {
-                        setProductSearch(val);
-                        if (selectedProductId) setSelectedProductId("");
-                      }}
+                      keyboardType="number-pad"
+                      value={tier.quantity === 0 ? "" : String(tier.quantity)}
+                      onChangeText={(value) =>
+                        updateTier(index, "quantity", value)
+                      }
+                      placeholder="1"
+                      placeholderTextColor="#94A3B8"
+                      style={[styles.input, typeface(font.medium, "500")]}
                     />
                   </View>
-                  {!selectedProductId && productSearch.length > 0 && (
-                    <View className="mt-1 bg-white border border-slate-100 rounded-xl shadow-lg z-10">
-                      {filteredMainProducts?.map((p) => (
-                        <TouchableOpacity
-                          key={p.id}
-                          onPress={() => {
-                            setSelectedProductId(p.id);
-                            setProductSearch(p.name);
-                          }}
-                          className="p-3 border-b border-slate-50"
-                        >
-                          <Text className="font-bold text-slate-700 text-xs">
-                            {p.name}
-                          </Text>
-                        </TouchableOpacity>
-                      ))}
-                    </View>
-                  )}
-                </View>
-              )}
-
-              {/* PRICING TABLE AREA */}
-              <View className="mt-2 pb-8">
-                <View className="flex-row justify-between items-center mb-3 ml-1">
-                  <Text className="text-xs font-bold text-slate-900">
-                    Pricing Settings
-                  </Text>
-                  {isBulk && (
-                    <TouchableOpacity
-                      onPress={() =>
-                        setTiers([...tiers, { quantity: 1, price: 0 }])
-                      }
-                      className="flex-row items-center bg-blue-50 px-3 py-1.5 rounded-xl border border-blue-100"
+                ) : null}
+                <View style={styles.priceField}>
+                  {isBulk ? (
+                    <Text
+                      style={[styles.fieldHint, typeface(font.medium, "500")]}
                     >
-                      <Plus size={12} color="#2563eb" />
-                      <Text className="text-blue-700 font-bold text-xs ml-1">
-                        Add Tier
-                      </Text>
-                    </TouchableOpacity>
-                  )}
+                      Pack price
+                    </Text>
+                  ) : null}
+                  <TextInput
+                    keyboardType="decimal-pad"
+                    value={tier.price === 0 ? "" : String(tier.price)}
+                    onChangeText={(value) => updateTier(index, "price", value)}
+                    placeholder="0.00"
+                    placeholderTextColor="#94A3B8"
+                    style={[styles.input, typeface(font.medium, "500")]}
+                  />
                 </View>
-
-                {tiers.map((tier, index) => (
-                  <View
-                    key={index}
-                    className="flex-row items-end gap-2 mb-3 bg-slate-50/50 p-3 rounded-xl border border-slate-100"
+                {isBulk && tiers.length > 1 ? (
+                  <Pressable
+                    onPress={() =>
+                      setTiers((prev) => prev.filter((_, i) => i !== index))
+                    }
+                    style={styles.remove}
+                    hitSlop={6}
                   >
-                    {(isBulk || isDiscount) && (
-                      <View className="flex-1">
-                        <Text className="text-[9px] font-black text-slate-400 mb-1.5 text-center">
-                          QTY
-                        </Text>
-                        <TextInput
-                          keyboardType="number-pad"
-                          value={
-                            tier.quantity === 0 ? "" : tier.quantity.toString()
-                          }
-                          className="bg-white p-3 rounded-xl font-black text-center text-slate-900 border border-slate-200/60 text-sm"
-                          onChangeText={(val) =>
-                            updateTier(index, "quantity", val)
-                          }
-                        />
-                      </View>
-                    )}
-
-                    <View className="flex-[2.5]">
-                      <Text className="text-[9px] font-black text-slate-400 mb-1.5 ml-1">
-                        {isBulk
-                          ? "TOTAL PACK PRICE (₱)"
-                          : "PROMO PRICE EACH (₱)"}
-                      </Text>
-                      <TextInput
-                        placeholder="0.00"
-                        keyboardType="decimal-pad"
-                        value={tier.price === 0 ? "" : tier.price.toString()}
-                        className="bg-white p-3 rounded-xl font-black text-slate-900 border border-slate-200/60 text-sm"
-                        onChangeText={(val) => updateTier(index, "price", val)}
-                      />
-                    </View>
-
-                    {isBulk && tiers.length > 1 && (
-                      <TouchableOpacity
-                        onPress={() =>
-                          setTiers(tiers.filter((_, i) => i !== index))
-                        }
-                        className="bg-rose-50 p-3.5 rounded-xl border border-rose-100 items-center justify-center mb-[1px]"
-                      >
-                        <Trash2 size={16} color="#e11d48" />
-                      </TouchableOpacity>
-                    )}
-                  </View>
-                ))}
+                    <Trash2 size={16} color="#E11D48" />
+                  </Pressable>
+                ) : null}
               </View>
-            </View>
+            ))}
           </ScrollView>
 
-          {/* GLOBAL MODAL SAVING TRIGGER */}
-          <View className="p-5 pb-8 border-t border-slate-100 bg-white">
+          <View style={styles.footer}>
             <TouchableOpacity
-              disabled={isProcessing}
               onPress={handleSubmit}
-              activeOpacity={0.8}
-              className={cn(
-                "h-14 rounded-2xl flex-row justify-center items-center shadow-sm",
-                isProcessing ? "bg-slate-300" : "bg-slate-900",
-              )}
+              disabled={isProcessing || !canSave}
+              style={[
+                styles.submit,
+                (isProcessing || !canSave) && styles.submitOff,
+              ]}
             >
               {isProcessing ? (
-                <ActivityIndicator color="white" />
+                <ActivityIndicator color="#FFFFFF" />
               ) : (
-                <>
-                  <Check size={16} color="white" />
-                  <Text className="text-white font-bold text-sm ml-2 uppercase tracking-wide">
-                    Save Promotion
-                  </Text>
-                </>
+                <Text style={[styles.submitText, typeface(font.semibold, "600")]}>
+                  Save promo
+                </Text>
               )}
             </TouchableOpacity>
           </View>
@@ -431,3 +371,286 @@ export default function CreatePromotionModal({
     </Modal>
   );
 }
+
+function Field({
+  label,
+  font,
+  children,
+}: {
+  label: string;
+  font: ReturnType<typeof useInter>;
+  children: React.ReactNode;
+}) {
+  return (
+    <View style={styles.field}>
+      <Text style={[styles.label, typeface(font.medium, "500")]}>{label}</Text>
+      {children}
+    </View>
+  );
+}
+
+function ProductPicker({
+  label,
+  placeholder,
+  query,
+  selectedId,
+  results,
+  onChangeQuery,
+  onSelect,
+  onClear,
+  font,
+}: {
+  label: string;
+  placeholder: string;
+  query: string;
+  selectedId: string | null;
+  results: Product[];
+  onChangeQuery: (value: string) => void;
+  onSelect: (item: Product) => void;
+  onClear: () => void;
+  font: ReturnType<typeof useInter>;
+}) {
+  const selected = Boolean(selectedId);
+
+  return (
+    <View style={styles.field}>
+      <Text style={[styles.label, typeface(font.medium, "500")]}>{label}</Text>
+      <View style={styles.search}>
+        <Search size={16} color="#94A3B8" />
+        <TextInput
+          placeholder={placeholder}
+          placeholderTextColor="#94A3B8"
+          value={query}
+          onChangeText={onChangeQuery}
+          style={[styles.searchInput, typeface(font.medium, "500")]}
+        />
+        {query.length > 0 ? (
+          <Pressable onPress={onClear} hitSlop={8}>
+            <X size={14} color="#94A3B8" />
+          </Pressable>
+        ) : null}
+      </View>
+      {selected ? (
+        <View style={styles.picked}>
+          <Check size={14} color={TINT} />
+          <Text
+            numberOfLines={1}
+            style={[styles.pickedText, typeface(font.medium, "500")]}
+          >
+            {query}
+          </Text>
+        </View>
+      ) : query.length > 0 ? (
+        <View style={styles.dropdown}>
+          {results.length === 0 ? (
+            <Text style={[styles.empty, typeface(font.regular, "400")]}>
+              No matching items
+            </Text>
+          ) : (
+            results.map((item, index) => (
+              <View key={item.id}>
+                {index > 0 ? <View style={styles.hairline} /> : null}
+                <Pressable
+                  onPress={() => onSelect(item)}
+                  style={styles.option}
+                >
+                  <Text
+                    numberOfLines={1}
+                    style={[styles.optionText, typeface(font.medium, "500")]}
+                  >
+                    {item.name}
+                  </Text>
+                </Pressable>
+              </View>
+            ))
+          )}
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  backdrop: {
+    flex: 1,
+    justifyContent: "flex-end",
+    backgroundColor: "rgba(15, 23, 42, 0.4)",
+  },
+  sheet: {
+    backgroundColor: "#FAFBFD",
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    maxHeight: "92%",
+  },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 22,
+    paddingTop: 20,
+    paddingBottom: 12,
+  },
+  identity: {
+    flex: 1,
+  },
+  title: {
+    fontSize: 20,
+    color: INK,
+    letterSpacing: -0.4,
+  },
+  subtitle: {
+    marginTop: 3,
+    fontSize: 13,
+    color: MUTED,
+  },
+  close: {
+    width: 36,
+    height: 36,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  body: {
+    paddingHorizontal: 22,
+    paddingBottom: 16,
+    gap: 16,
+  },
+  segment: {
+    flexDirection: "row",
+    backgroundColor: "#EEF1F6",
+    borderRadius: 14,
+    padding: 4,
+  },
+  segmentItem: {
+    flex: 1,
+    height: 40,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  segmentItemOn: {
+    backgroundColor: TINT,
+  },
+  segmentText: {
+    fontSize: 13,
+    color: INK,
+  },
+  segmentTextOn: {
+    color: "#FFFFFF",
+  },
+  field: {
+    gap: 8,
+  },
+  label: {
+    fontSize: 13,
+    color: MUTED,
+  },
+  input: {
+    backgroundColor: "#EEF1F6",
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    height: 46,
+    fontSize: 15,
+    color: INK,
+  },
+  search: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#EEF1F6",
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    height: 46,
+    gap: 8,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 15,
+    color: INK,
+    paddingVertical: 0,
+  },
+  picked: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: 2,
+  },
+  pickedText: {
+    flex: 1,
+    fontSize: 13,
+    color: TINT,
+  },
+  dropdown: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 14,
+    overflow: "hidden",
+  },
+  option: {
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  optionText: {
+    fontSize: 15,
+    color: INK,
+  },
+  empty: {
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontSize: 14,
+    color: MUTED,
+  },
+  hairline: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: LINE,
+    marginHorizontal: 14,
+  },
+  priceHead: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  link: {
+    fontSize: 13,
+    color: TINT,
+  },
+  fieldHint: {
+    fontSize: 12,
+    color: MUTED,
+    marginBottom: 6,
+  },
+  tierRow: {
+    flexDirection: "row",
+    alignItems: "flex-end",
+    gap: 8,
+  },
+  qtyField: {
+    width: 88,
+  },
+  priceField: {
+    flex: 1,
+  },
+  remove: {
+    width: 46,
+    height: 46,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 0,
+  },
+  footer: {
+    paddingHorizontal: 22,
+    paddingTop: 12,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: LINE,
+  },
+  submit: {
+    height: 48,
+    borderRadius: 14,
+    backgroundColor: TINT,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  submitOff: {
+    backgroundColor: "#CBD5E1",
+  },
+  submitText: {
+    color: "#FFFFFF",
+    fontSize: 16,
+  },
+});

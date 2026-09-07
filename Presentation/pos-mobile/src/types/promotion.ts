@@ -65,3 +65,8 @@ export interface PromotionCalculationResponse {
   savings: number;
   appliedPromotionName: string | null;
 }
+
+export interface AppliedPromoLine {
+  name: string;
+  savings: number;
+}

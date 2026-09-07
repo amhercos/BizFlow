@@ -8,6 +8,8 @@ import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
 const INK = "#0F172A";
 const MUTED = "#64748B";
 const LINE = "rgba(15, 23, 42, 0.08)";
+const TINT = "#2563EB";
+const GREEN = "#15803D";
 
 interface TransactionTableProps {
   data: RecentTransaction[];
@@ -71,20 +73,43 @@ export const TransactionTable = memo(function TransactionTable({
                   style={[styles.title, typeface(font.semibold, "600")]}
                   numberOfLines={1}
                 >
-                  {date.toLocaleDateString("en-PH", {
-                    weekday: "short",
-                    month: "short",
-                    day: "numeric",
-                  })}
-                  {" · "}
-                  {date.toLocaleTimeString([], {
-                    hour: "numeric",
-                    minute: "2-digit",
-                  })}
+                  {tx.itemCount} {tx.itemCount === 1 ? "item" : "items"}
                 </Text>
-                <Text style={[styles.meta, typeface(font.medium, "500")]}>
-                  {tx.paymentType} · #{tx.id.slice(-6).toUpperCase()}
-                </Text>
+                <View style={styles.metaRow}>
+                  <View
+                    style={[
+                      styles.payPill,
+                      tx.paymentType === "Credit"
+                        ? styles.payPillCredit
+                        : styles.payPillCash,
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.payPillText,
+                        {
+                          color:
+                            tx.paymentType === "Credit" ? TINT : GREEN,
+                        },
+                        typeface(font.medium, "500"),
+                      ]}
+                    >
+                      {tx.paymentType}
+                    </Text>
+                  </View>
+                  <Text style={[styles.meta, typeface(font.medium, "500")]}>
+                    {date.toLocaleDateString("en-PH", {
+                      weekday: "short",
+                      month: "short",
+                      day: "numeric",
+                    })}
+                    {" · "}
+                    {date.toLocaleTimeString([], {
+                      hour: "numeric",
+                      minute: "2-digit",
+                    })}
+                  </Text>
+                </View>
               </View>
               <Text style={[styles.amount, typeface(font.semibold, "600")]}>
                 {formatPHP(tx.totalAmount)}
@@ -111,14 +136,34 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: INK,
   },
+  metaRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginTop: 4,
+  },
+  payPill: {
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 999,
+  },
+  payPillCash: {
+    backgroundColor: "#E7F8EE",
+  },
+  payPillCredit: {
+    backgroundColor: "#DCEBFF",
+  },
+  payPillText: {
+    fontSize: 11,
+  },
   meta: {
-    marginTop: 2,
-    fontSize: 13,
+    flex: 1,
+    fontSize: 12,
     color: MUTED,
   },
   amount: {
     fontSize: 15,
-    color: INK,
+    color: TINT,
     fontVariant: ["tabular-nums"],
   },
   hairline: {

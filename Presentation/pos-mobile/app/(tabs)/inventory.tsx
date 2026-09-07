@@ -1,5 +1,6 @@
 import { DrawerMenuButton } from "@/components/navigation/DrawerMenuButton";
 import { useInventory } from "@/src/hooks/use-inventory";
+import { formatPHP } from "@/src/lib/math";
 import { typeface, useInter } from "@/src/theme/typography";
 import type { Category, Product } from "@/src/types/inventory";
 import * as Haptics from "expo-haptics";
@@ -12,12 +13,7 @@ import {
   X,
 } from "lucide-react-native";
 import { Skeleton } from "moti/skeleton";
-import React, {
-  ReactElement,
-  useCallback,
-  useMemo,
-  useState,
-} from "react";
+import React, { ReactElement, useCallback, useMemo, useState } from "react";
 import {
   Pressable,
   RefreshControl,
@@ -63,10 +59,47 @@ const FILTERS: { id: FilterType; label: string }[] = [
   { id: "non-perishable", label: "No expiry" },
 ];
 
-function stockColor(product: Product) {
+function isExpired(product: Product) {
+  return !!product.expiryDate && new Date(product.expiryDate) < new Date();
+}
+
+function stockTone(product: Product) {
   if (product.stockQuantity === 0) return "#E11D48";
   if (product.stockQuantity <= product.lowStockThreshold) return "#D97706";
   return "#15803D";
+}
+
+function stockCopy(product: Product) {
+  if (product.stockQuantity === 0) return "Out of stock";
+  return `${product.stockQuantity} in stock`;
+}
+
+function expiryCopy(product: Product) {
+  if (!product.expiryDate) return "No expiry";
+  return new Date(product.expiryDate).toLocaleDateString("en-PH", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
+function packCopy(product: Product) {
+  if (
+    product.packPrice != null &&
+    product.packPrice > 0 &&
+    product.piecesPerPack != null &&
+    product.piecesPerPack > 1
+  ) {
+    return `${formatPHP(product.packPrice)} · ${product.piecesPerPack} pcs`;
+  }
+  return "None";
+}
+
+function statusCopy(product: Product) {
+  if (product.stockQuantity === 0) return "Out";
+  if (isExpired(product)) return "Expired";
+  if (product.stockQuantity <= product.lowStockThreshold) return "Low";
+  return null;
 }
 
 export default function InventoryScreen(): ReactElement {
@@ -173,7 +206,7 @@ export default function InventoryScreen(): ReactElement {
         contentContainerStyle={{
           paddingTop: insets.top + 10,
           paddingHorizontal: 22,
-          paddingBottom: 110,
+          paddingBottom: 36,
         }}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
@@ -199,70 +232,89 @@ export default function InventoryScreen(): ReactElement {
           </View>
           <TouchableOpacity
             onPress={() => setModals((m) => ({ ...m, cat: true }))}
-            style={styles.iconBtn}
+            style={styles.headerGhost}
             accessibilityLabel="Manage categories"
           >
-            <FolderPlus size={18} color={INK} strokeWidth={1.8} />
+            <FolderPlus size={14} color={INK} strokeWidth={1.8} />
+            <Text
+              style={[styles.headerGhostText, typeface(font.medium, "500")]}
+            >
+              Category
+            </Text>
           </TouchableOpacity>
           <TouchableOpacity
             onPress={() => setModals((m) => ({ ...m, add: true }))}
-            style={styles.addBtn}
+            style={styles.headerAdd}
             accessibilityLabel="Add product"
           >
-            <Plus size={18} color="#FFFFFF" strokeWidth={2.2} />
+            <Plus size={14} color="#FFFFFF" strokeWidth={2.2} />
+            <Text
+              style={[styles.headerAddText, typeface(font.semibold, "600")]}
+            >
+              Add
+            </Text>
           </TouchableOpacity>
         </View>
 
-        <View style={styles.stats}>
+        <View style={styles.statRow}>
           {(
             [
               {
                 id: "low-stock" as const,
                 label: "Low",
                 value: stats.low,
-                color: "#D97706",
+                hot: "#B45309",
+                wash: "#FDE6D4",
               },
               {
                 id: "out-of-stock" as const,
                 label: "Out",
                 value: stats.out,
-                color: "#E11D48",
+                hot: "#BE123C",
+                wash: "#FDECEC",
               },
               {
                 id: "expired" as const,
                 label: "Expired",
                 value: stats.expired,
-                color: "#15803D",
+                hot: "#BE123C",
+                wash: "#FDECEC",
               },
             ] as const
-          ).map((item, index) => {
+          ).map((item) => {
             const active = activeFilter === item.id;
             const display =
               loading && products.length === 0 ? "—" : String(item.value);
+            const hot = item.value > 0;
             return (
-              <View key={item.id} style={styles.statWrap}>
-                {index > 0 ? <View style={styles.statRule} /> : null}
-                <Pressable onPress={() => setFilter(item.id)} style={styles.stat}>
-                  <Text
-                    style={[
-                      styles.statValue,
-                      { color: item.color },
-                      typeface(font.bold, "700"),
-                    ]}
-                  >
-                    {display}
-                  </Text>
-                  <Text
-                    style={[
-                      styles.statLabel,
-                      active && styles.statLabelOn,
-                      typeface(font.medium, "500"),
-                    ]}
-                  >
-                    {item.label}
-                  </Text>
-                </Pressable>
-              </View>
+              <Pressable
+                key={item.id}
+                onPress={() => setFilter(active ? "all" : item.id)}
+                style={[
+                  styles.stat,
+                  hot && { backgroundColor: item.wash },
+                  active && styles.statOn,
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.statLabel,
+                    active && styles.statLabelOn,
+                    typeface(font.medium, "500"),
+                  ]}
+                >
+                  {item.label}
+                </Text>
+                <Text
+                  style={[
+                    styles.statValue,
+                    { color: hot ? item.hot : INK },
+                    typeface(font.semibold, "600"),
+                  ]}
+                >
+                  {display}
+                </Text>
+              </Pressable>
             );
           })}
         </View>
@@ -331,7 +383,12 @@ export default function InventoryScreen(): ReactElement {
           <View style={{ marginTop: 8 }}>
             {[1, 2, 3, 4, 5, 6].map((i) => (
               <View key={i} style={{ paddingVertical: 12 }}>
-                <Skeleton colorMode="light" width="100%" height={18} radius={6} />
+                <Skeleton
+                  colorMode="light"
+                  width="100%"
+                  height={18}
+                  radius={6}
+                />
               </View>
             ))}
           </View>
@@ -523,52 +580,105 @@ function InventoryGridCard({
   fontFamily?: string;
   metaFamily?: string;
 }): ReactElement {
-  const expired =
-    !!product.expiryDate && new Date(product.expiryDate) < new Date();
-  const out = product.stockQuantity === 0;
+  const status = statusCopy(product);
+  const expired = isExpired(product);
+  const hasPack = packCopy(product) !== "None";
+  const details = [
+    { label: "Stock", value: stockCopy(product), color: stockTone(product) },
+    {
+      label: "Category",
+      value: product.categoryName ?? "Uncategorized",
+      color: INK,
+    },
+    {
+      label: "Pack",
+      value: packCopy(product),
+      color: hasPack ? TINT : MUTED,
+    },
+    {
+      label: "Expiry",
+      value: expiryCopy(product),
+      color: expired ? "#E11D48" : product.expiryDate ? INK : MUTED,
+    },
+  ];
 
   return (
-    <Pressable onPress={onEdit} onLongPress={onDelete} style={[styles.gridCard, { width }]}>
-      <Text
-        style={[styles.gridName, fontFamily ? { fontFamily } : { fontWeight: "600" }]}
-        numberOfLines={2}
-      >
-        {product.name}
-      </Text>
+    <Pressable
+      onPress={onEdit}
+      onLongPress={onDelete}
+      style={[styles.gridCard, { width }]}
+    >
+      <View style={styles.gridHead}>
+        <Text
+          style={[
+            styles.gridName,
+            fontFamily ? { fontFamily } : { fontWeight: "600" },
+          ]}
+          numberOfLines={2}
+        >
+          {product.name}
+        </Text>
+        {status ? (
+          <View
+            style={[
+              styles.statusPill,
+              status === "Low" ? styles.statusPillAmber : styles.statusPillRose,
+            ]}
+          >
+            <Text
+              style={[
+                styles.statusPillText,
+                { color: status === "Low" ? "#B45309" : "#BE123C" },
+                metaFamily ? { fontFamily } : { fontWeight: "500" },
+              ]}
+            >
+              {status}
+            </Text>
+          </View>
+        ) : null}
+      </View>
+
       <Text
         style={[
-          styles.gridQty,
-          { color: stockColor(product) },
-          fontFamily ? { fontFamily } : { fontWeight: "700" },
-        ]}
-      >
-        {out ? "Out of stock" : `${product.stockQuantity} in stock`}
-      </Text>
-      <Text
-        style={[styles.gridMeta, metaFamily ? { fontFamily } : { fontWeight: "500" }]}
-      >
-        ₱{Math.round(product.price).toLocaleString("en-PH")}
-        {product.packPrice != null &&
-        product.packPrice > 0 &&
-        product.piecesPerPack != null &&
-        product.piecesPerPack > 1
-          ? ` · ${product.piecesPerPack}pk`
-          : ""}
-      </Text>
-      <Text
-        style={[
-          styles.gridMeta,
-          { color: expired ? "#E11D48" : MUTED },
+          styles.gridKicker,
           metaFamily ? { fontFamily } : { fontWeight: "500" },
         ]}
       >
-        {product.expiryDate
-          ? new Date(product.expiryDate).toLocaleDateString("en-PH", {
-              month: "short",
-              day: "numeric",
-            })
-          : "No expiry"}
+        Piece price
       </Text>
+      <Text
+        style={[
+          styles.gridPrice,
+          fontFamily ? { fontFamily } : { fontWeight: "600" },
+        ]}
+      >
+        {formatPHP(product.price)}
+      </Text>
+
+      <View style={styles.gridRule} />
+
+      {details.map((row) => (
+        <View key={row.label} style={styles.detail}>
+          <Text
+            style={[
+              styles.detailLabel,
+              metaFamily ? { fontFamily } : { fontWeight: "500" },
+            ]}
+          >
+            {row.label}
+          </Text>
+          <Text
+            style={[
+              styles.detailValue,
+              { color: row.color ?? INK },
+              fontFamily ? { fontFamily } : { fontWeight: "600" },
+            ]}
+            numberOfLines={1}
+          >
+            {row.value}
+          </Text>
+        </View>
+      ))}
     </Pressable>
   );
 }
@@ -581,12 +691,13 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 20,
+    marginBottom: 22,
   },
   identity: {
     flex: 1,
     marginLeft: 12,
     marginRight: 8,
+    minWidth: 0,
   },
   title: {
     fontSize: 20,
@@ -598,54 +709,61 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: MUTED,
   },
-  iconBtn: {
-    width: 40,
-    height: 40,
+  headerGhost: {
+    height: 32,
+    paddingHorizontal: 10,
+    borderRadius: 10,
+    backgroundColor: "#EEF1F6",
+    flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
+    gap: 5,
+    marginRight: 8,
   },
-  addBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
+  headerGhostText: {
+    fontSize: 12,
+    color: INK,
+  },
+  headerAdd: {
+    height: 32,
+    paddingHorizontal: 10,
+    borderRadius: 10,
     backgroundColor: TINT,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  stats: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 16,
-    paddingVertical: 4,
+    gap: 4,
   },
-  statWrap: {
-    flex: 1,
+  headerAddText: {
+    fontSize: 12,
+    color: "#FFFFFF",
+  },
+  statRow: {
     flexDirection: "row",
     alignItems: "center",
+    gap: 10,
+    marginBottom: 18,
   },
   stat: {
-    flex: 1,
     flexDirection: "row",
     alignItems: "baseline",
     gap: 6,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    borderRadius: 10,
   },
-  statRule: {
-    width: StyleSheet.hairlineWidth,
-    height: 18,
-    backgroundColor: "rgba(15, 23, 42, 0.12)",
-    marginRight: 12,
-  },
-  statValue: {
-    fontSize: 18,
-    letterSpacing: -0.4,
-    fontVariant: ["tabular-nums"],
+  statOn: {
+    backgroundColor: "#DCEBFF",
   },
   statLabel: {
-    fontSize: 13,
+    fontSize: 12,
     color: MUTED,
   },
   statLabelOn: {
     color: INK,
+  },
+  statValue: {
+    fontSize: 14,
+    letterSpacing: -0.2,
+    fontVariant: ["tabular-nums"],
   },
   search: {
     flexDirection: "row",
@@ -653,7 +771,8 @@ const styles = StyleSheet.create({
     backgroundColor: "#EEF1F6",
     borderRadius: 16,
     paddingHorizontal: 14,
-    height: 46,
+    height: 48,
+    marginBottom: 4,
   },
   searchInput: {
     flex: 1,
@@ -663,7 +782,7 @@ const styles = StyleSheet.create({
     paddingVertical: 0,
   },
   filterScroll: {
-    marginTop: 12,
+    marginTop: 16,
     marginHorizontal: -22,
   },
   filterRow: {
@@ -671,10 +790,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 8,
     paddingHorizontal: 22,
+    paddingVertical: 2,
   },
   chip: {
-    paddingHorizontal: 12,
-    paddingVertical: 7,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
     borderRadius: 999,
     backgroundColor: "#EEF1F6",
   },
@@ -714,8 +834,8 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    marginTop: 28,
-    marginBottom: 4,
+    marginTop: 24,
+    marginBottom: 12,
   },
   listTitle: {
     fontSize: 13,
@@ -749,22 +869,73 @@ const styles = StyleSheet.create({
   },
   gridCard: {
     backgroundColor: "#F4F6FA",
-    borderRadius: 20,
-    padding: 14,
+    borderRadius: 14,
+    paddingHorizontal: 12,
+    paddingTop: 12,
+    paddingBottom: 10,
     marginBottom: 12,
   },
-  gridName: {
-    fontSize: 15,
-    color: INK,
-    marginBottom: 8,
-    minHeight: 38,
+  gridHead: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 8,
   },
-  gridQty: {
-    fontSize: 13,
+  gridName: {
+    flex: 1,
+    fontSize: 14,
+    color: INK,
+    lineHeight: 19,
+    letterSpacing: -0.2,
+  },
+  statusPill: {
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: 999,
+    marginTop: 1,
+  },
+  statusPillAmber: {
+    backgroundColor: "#FDE6D4",
+  },
+  statusPillRose: {
+    backgroundColor: "#FDECEC",
+  },
+  statusPillText: {
+    fontSize: 10,
+    letterSpacing: 0.2,
+  },
+  gridKicker: {
+    marginTop: 10,
+    fontSize: 11,
+    color: MUTED,
+  },
+  gridPrice: {
+    marginTop: 1,
+    fontSize: 16,
+    color: TINT,
+    letterSpacing: -0.3,
+    fontVariant: ["tabular-nums"],
+  },
+  gridRule: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: "rgba(15, 23, 42, 0.08)",
+    marginTop: 10,
     marginBottom: 4,
   },
-  gridMeta: {
-    fontSize: 12,
+  detail: {
+    flexDirection: "row",
+    alignItems: "baseline",
+    justifyContent: "space-between",
+    gap: 8,
+    paddingVertical: 4,
+  },
+  detailLabel: {
+    fontSize: 11,
     color: MUTED,
+  },
+  detailValue: {
+    flex: 1,
+    textAlign: "right",
+    fontSize: 12,
+    fontVariant: ["tabular-nums"],
   },
 });

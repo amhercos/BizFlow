@@ -1,8 +1,14 @@
-import { cn } from "@/src/lib/utils";
+import { typeface, useInter } from "@/src/theme/typography";
 import { type CustomerCredit } from "@/src/types/credit";
-import { Check, Plus, Search } from "lucide-react-native";
+import { formatPHP } from "@/src/lib/math";
+import { Search } from "lucide-react-native";
 import React, { useMemo, useState } from "react";
-import { Text, TextInput, TouchableOpacity, View } from "react-native";
+import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+
+const INK = "#0F172A";
+const MUTED = "#64748B";
+const TINT = "#2563EB";
+const LINE = "rgba(15, 23, 42, 0.08)";
 
 interface CreditPaymentProps {
   credits: CustomerCredit[];
@@ -27,10 +33,9 @@ export const CreditPayment = ({
   newCustomerContact,
   setNewCustomerContact,
 }: CreditPaymentProps) => {
-  // 1. Add local state for the search bar
+  const font = useInter();
   const [searchQuery, setSearchQuery] = useState("");
 
-  // 2. Compute filtered credits based on the search query
   const filteredCredits = useMemo(() => {
     if (!searchQuery.trim()) return credits;
     return credits.filter(
@@ -41,126 +46,199 @@ export const CreditPayment = ({
   }, [credits, searchQuery]);
 
   return (
-    <View className="gap-2">
-      {/* Emphasized New Customer Button/Checkbox */}
-      <TouchableOpacity
-        onPress={() => setIsNewCustomer(!isNewCustomer)}
-        className={cn(
-          "flex-row items-center p-4 mb-2 rounded-2xl border-2 transition-all",
-          isNewCustomer
-            ? "bg-slate-900 border-slate-900"
-            : "bg-emerald-50 border-emerald-200 border-dashed",
-        )}
-      >
-        <View
-          className={cn(
-            "w-6 h-6 rounded-lg items-center justify-center mr-3",
-            isNewCustomer ? "bg-white/20" : "bg-emerald-200",
-          )}
+    <View>
+      <View style={styles.toggleRow}>
+        <Pressable
+          onPress={() => setIsNewCustomer(false)}
+          style={[styles.toggle, !isNewCustomer && styles.toggleOn]}
         >
-          {isNewCustomer ? (
-            <Check size={14} color="white" />
-          ) : (
-            <Plus size={14} color="#059669" />
-          )}
-        </View>
-        <Text
-          className={cn(
-            "text-sm font-black uppercase tracking-wider",
-            isNewCustomer ? "text-white" : "text-emerald-700",
-          )}
+          <Text
+            style={[
+              styles.toggleText,
+              !isNewCustomer && styles.toggleTextOn,
+              typeface(font.medium, "500"),
+            ]}
+          >
+            Existing
+          </Text>
+        </Pressable>
+        <Pressable
+          onPress={() => setIsNewCustomer(true)}
+          style={[styles.toggle, isNewCustomer && styles.toggleOn]}
         >
-          {isNewCustomer ? "New Customer Details" : "Add New Customer Credit"}
-        </Text>
-      </TouchableOpacity>
+          <Text
+            style={[
+              styles.toggleText,
+              isNewCustomer && styles.toggleTextOn,
+              typeface(font.medium, "500"),
+            ]}
+          >
+            New customer
+          </Text>
+        </Pressable>
+      </View>
 
       {isNewCustomer ? (
-        // New Customer Form
-        <View className="gap-3 mt-2">
+        <View style={styles.form}>
           <TextInput
-            placeholder="Enter Customer Name"
+            placeholder="Customer name"
+            placeholderTextColor="#94A3B8"
             value={newCustomerName}
             onChangeText={setNewCustomerName}
-            className="h-14 bg-slate-50 rounded-2xl px-4 font-bold border border-slate-100"
-            placeholderTextColor="#94a3b8"
+            style={[styles.input, typeface(font.medium, "500")]}
           />
           <TextInput
-            placeholder="Enter Contact Number"
+            placeholder="Contact number"
+            placeholderTextColor="#94A3B8"
             value={newCustomerContact}
             onChangeText={setNewCustomerContact}
             keyboardType="phone-pad"
-            className="h-14 bg-slate-50 rounded-2xl px-4 font-bold border border-slate-100"
-            placeholderTextColor="#94a3b8"
+            style={[styles.input, typeface(font.medium, "500")]}
           />
         </View>
       ) : (
-        // Existing Customers List with Search
-        <View className="gap-2 mt-2">
-          {/* Search Bar */}
-          <View className="flex-row items-center bg-slate-50 border border-slate-200 rounded-xl px-4 h-12 mb-2">
-            <Search size={18} color="#94a3b8" />
+        <View>
+          <View style={styles.search}>
+            <Search size={16} color="#94A3B8" />
             <TextInput
-              placeholder="Search customers..."
+              placeholder="Search customers"
+              placeholderTextColor="#94A3B8"
               value={searchQuery}
               onChangeText={setSearchQuery}
-              className="flex-1 ml-3 font-semibold text-slate-700 h-full"
-              placeholderTextColor="#94a3b8"
+              style={[styles.searchInput, typeface(font.medium, "500")]}
             />
           </View>
-
-          {/* Filtered List */}
-          {filteredCredits.map((c) => (
-            <TouchableOpacity
-              key={c.id}
-              // FIX: If the clicked ID is already selected, pass an empty string to unselect it
-              onPress={() =>
-                setSelectedCreditId(selectedCreditId === c.id ? "" : c.id)
-              }
-              className={cn(
-                "h-14 rounded-2xl px-4 flex-row items-center border",
-                selectedCreditId === c.id
-                  ? "bg-slate-900 border-slate-900"
-                  : "bg-white border-slate-100",
-              )}
-            >
-              <View className="flex-1">
-                <Text
-                  className={cn(
-                    "font-bold",
-                    selectedCreditId === c.id ? "text-white" : "text-slate-700",
-                  )}
-                >
-                  {c.customerName}
-                </Text>
-                {c.contactInfo && (
-                  <Text
-                    className={cn(
-                      "text-[10px]",
-                      selectedCreditId === c.id
-                        ? "text-slate-300"
-                        : "text-slate-400",
-                    )}
-                  >
-                    {c.contactInfo}
-                  </Text>
-                )}
-              </View>
-              {selectedCreditId === c.id && <Check size={16} color="white" />}
-            </TouchableOpacity>
-          ))}
-
-          {/* Empty States */}
           {credits.length === 0 ? (
-            <Text className="text-center text-slate-400 text-xs italic py-4">
-              No existing credits found.
+            <Text style={[styles.empty, typeface(font.regular, "400")]}>
+              No customer credits yet
             </Text>
           ) : filteredCredits.length === 0 ? (
-            <Text className="text-center text-slate-400 text-xs italic py-4">
-              No matching customers found for "{searchQuery}".
+            <Text style={[styles.empty, typeface(font.regular, "400")]}>
+              No matching customers
             </Text>
-          ) : null}
+          ) : (
+            filteredCredits.map((c, index) => {
+              const active = selectedCreditId === c.id;
+              return (
+                <View key={c.id}>
+                  {index > 0 ? <View style={styles.hairline} /> : null}
+                  <Pressable
+                    onPress={() =>
+                      setSelectedCreditId(active ? "" : c.id)
+                    }
+                    style={styles.row}
+                  >
+                    <View style={styles.rowBody}>
+                      <Text
+                        style={[
+                          styles.name,
+                          active && styles.nameOn,
+                          typeface(font.semibold, "600"),
+                        ]}
+                      >
+                        {c.customerName}
+                      </Text>
+                      <Text style={[styles.meta, typeface(font.medium, "500")]}>
+                        {c.contactInfo ? `${c.contactInfo} · ` : ""}
+                        {formatPHP(c.creditAmount)} due
+                      </Text>
+                    </View>
+                    {active ? <View style={styles.pickedDot} /> : null}
+                  </Pressable>
+                </View>
+              );
+            })
+          )}
         </View>
       )}
     </View>
   );
 };
+
+const styles = StyleSheet.create({
+  toggleRow: {
+    flexDirection: "row",
+    backgroundColor: "#EEF1F6",
+    borderRadius: 999,
+    padding: 3,
+    marginBottom: 14,
+    alignSelf: "flex-start",
+  },
+  toggle: {
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 999,
+  },
+  toggleOn: {
+    backgroundColor: "#FFFFFF",
+  },
+  toggleText: {
+    fontSize: 13,
+    color: MUTED,
+  },
+  toggleTextOn: {
+    color: INK,
+  },
+  form: {
+    gap: 10,
+  },
+  input: {
+    backgroundColor: "#EEF1F6",
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    height: 46,
+    fontSize: 15,
+    color: INK,
+  },
+  search: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#EEF1F6",
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    height: 46,
+    marginBottom: 8,
+    gap: 8,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 15,
+    color: INK,
+    paddingVertical: 0,
+  },
+  row: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 12,
+  },
+  rowBody: {
+    flex: 1,
+  },
+  name: {
+    fontSize: 15,
+    color: INK,
+  },
+  nameOn: {
+    color: TINT,
+  },
+  meta: {
+    marginTop: 2,
+    fontSize: 12,
+    color: MUTED,
+  },
+  pickedDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: TINT,
+  },
+  hairline: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: LINE,
+  },
+  empty: {
+    paddingVertical: 16,
+    fontSize: 14,
+    color: MUTED,
+  },
+});

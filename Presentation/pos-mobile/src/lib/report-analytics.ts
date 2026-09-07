@@ -26,12 +26,12 @@ function inRange(time: number, start: number, end: number) {
 
 function hourSeries(transactions: RecentTransaction[]): SeriesPoint[] {
   const slots = [
-    { label: "6a", start: 6, end: 9 },
-    { label: "9a", start: 9, end: 12 },
-    { label: "12p", start: 12, end: 15 },
-    { label: "3p", start: 15, end: 18 },
-    { label: "6p", start: 18, end: 21 },
-    { label: "9p", start: 21, end: 24 },
+    { label: "6am", start: 6, end: 9 },
+    { label: "9am", start: 9, end: 12 },
+    { label: "12pm", start: 12, end: 15 },
+    { label: "3pm", start: 15, end: 18 },
+    { label: "6pm", start: 18, end: 21 },
+    { label: "9pm", start: 21, end: 24 },
   ];
 
   return slots.map((slot) => {
@@ -81,7 +81,10 @@ function monthSeries(transactions: RecentTransaction[]): SeriesPoint[] {
       inRange(new Date(tx.transactionDate).getTime(), startMs, endMs),
     );
     return {
-      label: start.toLocaleDateString("en-PH", { month: "short", day: "numeric" }),
+      label: start.toLocaleDateString("en-PH", {
+        month: "short",
+        day: "numeric",
+      }),
       sales: ofWeek.reduce((sum, tx) => sum + tx.totalAmount, 0),
       orders: ofWeek.length,
     };

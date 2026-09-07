@@ -1,23 +1,31 @@
-import { cn } from "@/src/lib/utils";
-import { Info, Plus, Trash2, X } from "lucide-react-native";
+import { typeface, useInter } from "@/src/theme/typography";
+import { Plus, Trash2, X } from "lucide-react-native";
 import React, { useState } from "react";
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
   Modal,
   Platform,
+  Pressable,
   ScrollView,
+  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { usePromotions } from "../../src/hooks/use-promotions";
 import {
   Promotion,
   PromotionType,
   UpdatePromotionRequest,
 } from "../../src/types/promotion";
+
+const INK = "#0F172A";
+const MUTED = "#64748B";
+const TINT = "#2563EB";
+const LINE = "rgba(15, 23, 42, 0.08)";
 
 interface EditPromotionModalProps {
   isVisible: boolean;
@@ -30,13 +38,15 @@ export default function EditPromotionModal({
   promotion,
   onClose,
 }: EditPromotionModalProps) {
+  const insets = useSafeAreaInsets();
+  const font = useInter();
   const { updatePromotion, isProcessing } = usePromotions();
   const [name, setName] = useState(promotion.name);
   const [tiers, setTiers] = useState(() =>
-    promotion.tiers.map((t) => ({
-      id: t.id,
-      quantity: t.quantity,
-      price: t.price,
+    promotion.tiers.map((tier) => ({
+      id: tier.id,
+      quantity: tier.quantity,
+      price: tier.price,
     })),
   );
 
@@ -45,199 +55,190 @@ export default function EditPromotionModal({
   const isBundle =
     promotion.type === PromotionType.Bundle || promotion.type === "Bundle";
   const isDiscount =
-    promotion.type === PromotionType.Discount || promotion.type === "Discount";
+    promotion.type === PromotionType.Discount ||
+    promotion.type === "Discount";
+
+  const hint = isDiscount
+    ? "One promo price"
+    : isBulk
+      ? "Quantity breaks"
+      : "Buy with another item";
 
   const updateTier = (
     index: number,
     field: "quantity" | "price",
     value: string,
   ) => {
-    const newTiers = [...tiers];
     const cleaned = value.replace(/[^0-9.]/g, "");
     const numValue = cleaned === "" ? 0 : parseFloat(cleaned);
-
-    if (field === "quantity") newTiers[index].quantity = Math.floor(numValue);
-    if (field === "price") newTiers[index].price = numValue;
-    setTiers(newTiers);
-  };
-
-  const addTier = () => {
-    setTiers([...tiers, { id: undefined, quantity: 1, price: 0 }]);
-  };
-
-  const removeTier = (index: number) => {
-    setTiers(tiers.filter((_, i) => i !== index));
+    setTiers((prev) => {
+      const next = [...prev];
+      if (field === "quantity") next[index].quantity = Math.floor(numValue);
+      if (field === "price") next[index].price = numValue;
+      return next;
+    });
   };
 
   const handleUpdate = () => {
     const payload: UpdatePromotionRequest = {
       id: promotion.id,
       mainProductId: promotion.mainProductId,
-      name,
+      name: name.trim(),
       type: promotion.type as string,
       isActive: promotion.isActive,
-      tiers: tiers.map((t) => ({ quantity: t.quantity, price: t.price })),
+      tiers: tiers.map((tier) => ({
+        quantity: tier.quantity,
+        price: tier.price,
+      })),
       tieUpProductId: promotion.tieUpProductId,
       tieUpQuantity: promotion.tieUpQuantity,
     };
 
     updatePromotion(payload, {
-      onSuccess: () => {
-        onClose();
-      },
+      onSuccess: () => onClose(),
     });
   };
 
   return (
-    <Modal visible={isVisible} animationType="slide" transparent>
+    <Modal
+      visible={isVisible}
+      animationType="slide"
+      transparent
+      onRequestClose={onClose}
+    >
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : "height"}
-        className="flex-1 justify-end bg-black/50"
+        style={styles.backdrop}
       >
-        <View className="bg-white rounded-t-[40px] h-[85%] px-6 pt-8 shadow-2xl">
-          {/* --- HEADER --- */}
-          <View className="flex-row justify-between items-center mb-5">
-            <View className="flex-1 pr-2">
-              <Text className="text-xs font-black uppercase tracking-widest text-blue-600 mb-0.5">
-                Modify Promotion Strategy
+        <View
+          style={[
+            styles.sheet,
+            { paddingBottom: Math.max(insets.bottom, 16) },
+          ]}
+        >
+          <View style={styles.header}>
+            <View style={styles.identity}>
+              <Text style={[styles.title, typeface(font.bold, "700")]}>
+                Edit promo
               </Text>
               <Text
-                className="text-2xl font-black text-slate-900 tracking-tight"
                 numberOfLines={1}
+                style={[styles.subtitle, typeface(font.medium, "500")]}
               >
-                {promotion.productName ?? "Unknown Item"}
+                {promotion.productName ?? "Unknown item"} · {hint}
               </Text>
             </View>
-            <TouchableOpacity
-              onPress={onClose}
-              className="bg-slate-100 p-2.5 rounded-full"
-            >
-              <X size={18} color="#475569" />
+            <TouchableOpacity onPress={onClose} style={styles.close} hitSlop={8}>
+              <X size={18} color={INK} />
             </TouchableOpacity>
           </View>
 
-          {/* --- SYSTEM EXPLANATION HINT BOX --- */}
-          <View className="bg-blue-50/70 border border-blue-100 p-3.5 rounded-2xl flex-row items-start mb-5">
-            <Info size={16} color="#2563eb" style={{ marginTop: 2 }} />
-            <Text className="text-blue-900 text-xs font-semibold ml-2.5 flex-1 leading-4">
-              {isDiscount &&
-                "Flat Discount mode changes the single unit base price. Modifying this structure directly overrides standard item logic on active POS runs."}
-              {isBulk &&
-                "Bulk settings use quantity breaks. Set absolute wholesale group tier limits (e.g. 3x items total cash register charge price)."}
-              {isBundle &&
-                `Bundle rule binds this product with another secondary requirement. Must cross-verify rules carefully.`}
-            </Text>
-          </View>
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+            contentContainerStyle={styles.body}
+          >
+            {isBundle && promotion.tieUpProductName ? (
+              <Text style={[styles.note, typeface(font.medium, "500")]}>
+                Pairs with {promotion.tieUpProductName}
+              </Text>
+            ) : null}
 
-          <ScrollView showsVerticalScrollIndicator={false} className="flex-1">
-            {/* --- NAME INPUT --- */}
-            <View className="mb-5">
-              <Text className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-2 ml-1">
-                Administrative Label Name
+            <View style={styles.field}>
+              <Text style={[styles.label, typeface(font.medium, "500")]}>
+                Name
               </Text>
               <TextInput
-                className="bg-slate-50 p-4 rounded-2xl font-bold text-slate-900 border border-slate-100 text-sm"
                 value={name}
                 onChangeText={setName}
-                placeholder="Give this promotion plan a label..."
+                placeholder="Deal name"
+                placeholderTextColor="#94A3B8"
+                style={[styles.input, typeface(font.medium, "500")]}
               />
             </View>
 
-            {/* --- PRICING TIERS LIST --- */}
-            <View className="mb-6">
-              <View className="flex-row justify-between items-center mb-3 ml-1">
-                <Text className="text-[10px] font-black text-slate-400 uppercase tracking-wider">
-                  {isDiscount
-                    ? "Active Discount Value"
-                    : "Target Pricing Configuration Table"}
-                </Text>
-
-                {isBulk && (
-                  <TouchableOpacity
-                    onPress={addTier}
-                    className="flex-row items-center bg-blue-50 px-3 py-1.5 rounded-xl border border-blue-100"
-                  >
-                    <Plus size={12} color="#2563eb" />
-                    <Text className="text-blue-700 font-black text-[10px] uppercase ml-1">
-                      Add Tier
-                    </Text>
-                  </TouchableOpacity>
-                )}
-              </View>
-
-              {tiers.length === 0 ? (
-                <View className="bg-slate-50 rounded-2xl p-6 items-center border border-dashed border-slate-200">
-                  <Text className="text-slate-400 font-bold text-xs">
-                    No active price breaks configure.
+            <View style={styles.priceHead}>
+              <Text style={[styles.label, typeface(font.medium, "500")]}>
+                {isBulk ? "Price breaks" : "Promo price"}
+              </Text>
+              {isBulk ? (
+                <Pressable
+                  onPress={() =>
+                    setTiers((prev) => [
+                      ...prev,
+                      { id: undefined, quantity: 1, price: 0 },
+                    ])
+                  }
+                  hitSlop={6}
+                >
+                  <Text style={[styles.link, typeface(font.medium, "500")]}>
+                    Add tier
                   </Text>
-                </View>
-              ) : (
-                tiers.map((tier, index) => (
-                  <View
-                    key={index}
-                    className="flex-row items-end gap-2 mb-3 bg-slate-50/50 p-3 rounded-2xl border border-slate-100"
-                  >
-                    <View className="flex-1">
-                      <Text className="text-[9px] font-black text-slate-400 mb-1.5 ml-1">
-                        MIN QTY
-                      </Text>
-                      <TextInput
-                        className={cn(
-                          "bg-white p-3.5 rounded-xl font-black text-center text-slate-900 border border-slate-200/60 text-sm",
-                          isDiscount && "bg-slate-100 text-slate-400",
-                        )}
-                        keyboardType="number-pad"
-                        editable={!isDiscount}
-                        value={tier.quantity.toString()}
-                        onChangeText={(v) => updateTier(index, "quantity", v)}
-                      />
-                    </View>
-
-                    <View className="flex-[2.5]">
-                      <Text className="text-[9px] font-black text-slate-400 mb-1.5 ml-1">
-                        {isBulk
-                          ? "TOTAL PACK PROMO CHARGE (₱)"
-                          : "PROMO RETAIL PRICE EACH (₱)"}
-                      </Text>
-                      <TextInput
-                        className="bg-white p-3.5 rounded-xl font-black text-slate-900 border border-slate-200/60 text-sm"
-                        keyboardType="decimal-pad"
-                        value={tier.price === 0 ? "" : tier.price.toString()}
-                        placeholder="0.00"
-                        onChangeText={(v) => updateTier(index, "price", v)}
-                      />
-                    </View>
-
-                    {isBulk && tiers.length > 1 && (
-                      <TouchableOpacity
-                        onPress={() => removeTier(index)}
-                        className="bg-rose-50 p-3.5 rounded-xl border border-rose-100 items-center justify-center mb-[1px]"
-                      >
-                        <Trash2 size={16} color="#e11d48" />
-                      </TouchableOpacity>
-                    )}
-                  </View>
-                ))
-              )}
+                </Pressable>
+              ) : null}
             </View>
+
+            {tiers.map((tier, index) => (
+              <View key={index} style={styles.tierRow}>
+                {isBulk ? (
+                  <View style={styles.qtyField}>
+                    <Text
+                      style={[styles.fieldHint, typeface(font.medium, "500")]}
+                    >
+                      Qty
+                    </Text>
+                    <TextInput
+                      keyboardType="number-pad"
+                      value={String(tier.quantity)}
+                      onChangeText={(value) =>
+                        updateTier(index, "quantity", value)
+                      }
+                      style={[styles.input, typeface(font.medium, "500")]}
+                    />
+                  </View>
+                ) : null}
+                <View style={styles.priceField}>
+                  <Text style={[styles.fieldHint, typeface(font.medium, "500")]}>
+                    {isBulk ? "Pack price" : "Price"}
+                  </Text>
+                  <TextInput
+                    keyboardType="decimal-pad"
+                    value={tier.price === 0 ? "" : String(tier.price)}
+                    placeholder="0.00"
+                    placeholderTextColor="#94A3B8"
+                    onChangeText={(value) => updateTier(index, "price", value)}
+                    style={[styles.input, typeface(font.medium, "500")]}
+                  />
+                </View>
+                {isBulk && tiers.length > 1 ? (
+                  <Pressable
+                    onPress={() =>
+                      setTiers((prev) => prev.filter((_, i) => i !== index))
+                    }
+                    style={styles.remove}
+                    hitSlop={6}
+                  >
+                    <Trash2 size={16} color="#E11D48" />
+                  </Pressable>
+                ) : null}
+              </View>
+            ))}
           </ScrollView>
 
-          {/* --- FOOTER ACTION BAR --- */}
-          <View className="p-5 border-t border-slate-50 bg-white">
+          <View style={styles.footer}>
             <TouchableOpacity
               onPress={handleUpdate}
-              disabled={isProcessing}
-              activeOpacity={0.8}
-              className={cn(
-                "h-14 rounded-2xl flex-row justify-center items-center shadow-lg",
-                isProcessing ? "bg-slate-200" : "bg-slate-900 shadow-slate-300",
-              )}
+              disabled={isProcessing || !name.trim()}
+              style={[
+                styles.submit,
+                (isProcessing || !name.trim()) && styles.submitOff,
+              ]}
             >
               {isProcessing ? (
-                <ActivityIndicator color="white" />
+                <ActivityIndicator color="#FFFFFF" />
               ) : (
-                <Text className="text-white font-black text-sm ml-2 uppercase tracking-widest">
-                  Save Changes & Push Live
+                <Text style={[styles.submitText, typeface(font.semibold, "600")]}>
+                  Save changes
                 </Text>
               )}
             </TouchableOpacity>
@@ -247,3 +248,118 @@ export default function EditPromotionModal({
     </Modal>
   );
 }
+
+const styles = StyleSheet.create({
+  backdrop: {
+    flex: 1,
+    justifyContent: "flex-end",
+    backgroundColor: "rgba(15, 23, 42, 0.4)",
+  },
+  sheet: {
+    backgroundColor: "#FAFBFD",
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    maxHeight: "92%",
+  },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 22,
+    paddingTop: 20,
+    paddingBottom: 12,
+  },
+  identity: {
+    flex: 1,
+  },
+  title: {
+    fontSize: 20,
+    color: INK,
+    letterSpacing: -0.4,
+  },
+  subtitle: {
+    marginTop: 3,
+    fontSize: 13,
+    color: MUTED,
+  },
+  close: {
+    width: 36,
+    height: 36,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  body: {
+    paddingHorizontal: 22,
+    paddingBottom: 16,
+    gap: 16,
+  },
+  note: {
+    fontSize: 13,
+    color: MUTED,
+  },
+  field: {
+    gap: 8,
+  },
+  label: {
+    fontSize: 13,
+    color: MUTED,
+  },
+  input: {
+    backgroundColor: "#EEF1F6",
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    height: 46,
+    fontSize: 15,
+    color: INK,
+  },
+  priceHead: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  link: {
+    fontSize: 13,
+    color: TINT,
+  },
+  fieldHint: {
+    fontSize: 12,
+    color: MUTED,
+    marginBottom: 6,
+  },
+  tierRow: {
+    flexDirection: "row",
+    alignItems: "flex-end",
+    gap: 8,
+  },
+  qtyField: {
+    width: 88,
+  },
+  priceField: {
+    flex: 1,
+  },
+  remove: {
+    width: 46,
+    height: 46,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  footer: {
+    paddingHorizontal: 22,
+    paddingTop: 12,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: LINE,
+  },
+  submit: {
+    height: 48,
+    borderRadius: 14,
+    backgroundColor: TINT,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  submitOff: {
+    backgroundColor: "#CBD5E1",
+  },
+  submitText: {
+    color: "#FFFFFF",
+    fontSize: 16,
+  },
+});

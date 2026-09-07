@@ -1,8 +1,15 @@
+import { formatPHP } from "@/src/lib/math";
 import { typeface, type AppFonts } from "@/src/theme/typography";
 import type { Product } from "@/src/types/inventory";
 import { ChevronsUpDown, Edit3, Trash2 } from "lucide-react-native";
 import React, { ReactElement, useMemo, useState } from "react";
-import { Pressable, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import {
+  Pressable,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
 import ReanimatedSwipeable from "react-native-gesture-handler/ReanimatedSwipeable";
 import Reanimated, {
   SharedValue,
@@ -52,10 +59,27 @@ interface InventoryTableProps {
   font?: AppFonts;
 }
 
-function stockColor(product: Product) {
+function isExpired(product: Product) {
+  return !!product.expiryDate && new Date(product.expiryDate) < new Date();
+}
+
+function stockTone(product: Product) {
   if (product.stockQuantity === 0) return "#E11D48";
   if (product.stockQuantity <= product.lowStockThreshold) return "#D97706";
   return "#15803D";
+}
+
+function stockCopy(product: Product) {
+  if (product.stockQuantity === 0) return "Out of stock";
+  return `${product.stockQuantity} in stock`;
+}
+
+function expiryCopy(product: Product) {
+  if (!product.expiryDate) return "No expiry";
+  return new Date(product.expiryDate).toLocaleDateString("en-PH", {
+    month: "short",
+    day: "numeric",
+  });
 }
 
 export function InventoryTable({
@@ -84,19 +108,17 @@ export function InventoryTable({
         style={styles.sort}
       >
         <Text style={[styles.sortText, typeface(font.medium, "500")]}>
-          Sort by price
+          {priceSort === "asc"
+            ? "Price · low to high"
+            : priceSort === "desc"
+              ? "Price · high to low"
+              : "Sort by price"}
         </Text>
         <ChevronsUpDown size={12} color="#94A3B8" />
       </Pressable>
 
       {sortedProducts.map((product, index) => {
-        const expired =
-          !!product.expiryDate && new Date(product.expiryDate) < new Date();
-        const hasPack =
-          product.packPrice != null &&
-          product.packPrice > 0 &&
-          product.piecesPerPack != null &&
-          product.piecesPerPack > 1;
+        const expired = isExpired(product);
 
         return (
           <View key={product.id}>
@@ -117,41 +139,40 @@ export function InventoryTable({
                 onPress={() => onEdit(product)}
                 style={styles.row}
               >
-                <View style={styles.body}>
-                  <Text
-                    style={[styles.name, typeface(font.semibold, "600")]}
-                    numberOfLines={1}
-                  >
-                    {product.name}
-                  </Text>
-                  <Text
-                    style={[styles.meta, typeface(font.medium, "500")]}
-                    numberOfLines={1}
-                  >
-                    {product.categoryName ?? "Uncategorized"}
-                    {" · "}
-                    ₱{Math.round(product.price).toLocaleString("en-PH")}
-                    {hasPack ? ` · ${product.piecesPerPack}pk` : ""}
-                    {" · "}
-                    <Text style={{ color: expired ? "#E11D48" : MUTED }}>
-                      {product.expiryDate
-                        ? new Date(product.expiryDate).toLocaleDateString(
-                            undefined,
-                            { month: "short", day: "numeric" },
-                          )
-                        : "No expiry"}
+                <View style={styles.col}>
+                  <View style={styles.line}>
+                    <Text
+                      style={[styles.name, typeface(font.semibold, "600")]}
+                      numberOfLines={1}
+                    >
+                      {product.name}
                     </Text>
-                  </Text>
+                    <Text style={[styles.price, typeface(font.semibold, "600")]}>
+                      {formatPHP(product.price)}
+                    </Text>
+                  </View>
+                  <View style={styles.line}>
+                    <Text
+                      style={[styles.meta, typeface(font.medium, "500")]}
+                      numberOfLines={1}
+                    >
+                      <Text style={{ color: stockTone(product) }}>
+                        {stockCopy(product)}
+                      </Text>
+                      {" · "}
+                      {product.categoryName ?? "Uncategorized"}
+                    </Text>
+                    <Text
+                      style={[
+                        styles.qty,
+                        expired && styles.qtyHot,
+                        typeface(font.medium, "500"),
+                      ]}
+                    >
+                      {expired ? "Expired" : expiryCopy(product)}
+                    </Text>
+                  </View>
                 </View>
-                <Text
-                  style={[
-                    styles.qty,
-                    { color: stockColor(product) },
-                    typeface(font.semibold, "600"),
-                  ]}
-                >
-                  {product.stockQuantity}
-                </Text>
               </Pressable>
             </ReanimatedSwipeable>
           </View>
@@ -167,35 +188,50 @@ const styles = StyleSheet.create({
     alignItems: "center",
     alignSelf: "flex-end",
     gap: 4,
-    paddingVertical: 4,
-    marginBottom: 4,
+    paddingVertical: 8,
+    marginBottom: 6,
   },
   sortText: {
     fontSize: 12,
     color: MUTED,
   },
   row: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 14,
+    paddingVertical: 16,
     backgroundColor: "#FAFBFD",
   },
-  body: {
-    flex: 1,
-    marginRight: 12,
+  col: {
+    gap: 5,
+  },
+  line: {
+    flexDirection: "row",
+    alignItems: "baseline",
+    justifyContent: "space-between",
+    gap: 12,
   },
   name: {
+    flex: 1,
     fontSize: 15,
     color: INK,
+    letterSpacing: -0.2,
+  },
+  price: {
+    fontSize: 15,
+    color: TINT,
+    fontVariant: ["tabular-nums"],
+    letterSpacing: -0.2,
   },
   meta: {
-    marginTop: 2,
-    fontSize: 13,
+    flex: 1,
+    fontSize: 12,
     color: MUTED,
   },
   qty: {
-    fontSize: 16,
+    fontSize: 12,
+    color: MUTED,
     fontVariant: ["tabular-nums"],
+  },
+  qtyHot: {
+    color: "#E11D48",
   },
   hairline: {
     height: StyleSheet.hairlineWidth,
@@ -207,7 +243,7 @@ const styles = StyleSheet.create({
   },
   action: {
     width: 80,
-    minHeight: 64,
+    minHeight: 56,
     justifyContent: "center",
     alignItems: "center",
     alignSelf: "stretch",

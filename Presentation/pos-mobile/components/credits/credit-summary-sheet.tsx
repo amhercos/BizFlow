@@ -1,21 +1,25 @@
+import { formatPHP } from "@/src/lib/math";
+import { typeface, useInter } from "@/src/theme/typography";
 import type { CustomerCreditSummary } from "@/src/types/credit";
-import {
-    ArrowDownLeft,
-    Calendar,
-    ShoppingBag,
-    User,
-    X,
-} from "lucide-react-native";
+import { X } from "lucide-react-native";
 import React from "react";
 import {
-    ActivityIndicator,
-    Modal,
-    SafeAreaView,
-    ScrollView,
-    Text,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Modal,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+
+const INK = "#0F172A";
+const MUTED = "#64748B";
+const TINT = "#2563EB";
+const GREEN = "#15803D";
+const AMBER = "#B45309";
+const LINE = "rgba(15, 23, 42, 0.08)";
 
 interface CreditSummarySheetProps {
   summary: CustomerCreditSummary | null;
@@ -30,15 +34,16 @@ export function CreditSummarySheet({
   onClose,
   isLoading,
 }: CreditSummarySheetProps) {
+  const insets = useSafeAreaInsets();
+  const font = useInter();
+  const settled = (summary?.totalDebt ?? 0) === 0;
+
   const formatDate = (dateStr: string) =>
     new Date(dateStr).toLocaleDateString("en-PH", {
       month: "short",
       day: "numeric",
       year: "numeric",
     });
-
-  const formatPHP = (val: number) =>
-    `₱${val.toLocaleString("en-PH", { minimumFractionDigits: 2 })}`;
 
   return (
     <Modal
@@ -47,129 +52,287 @@ export function CreditSummarySheet({
       onRequestClose={onClose}
       presentationStyle="pageSheet"
     >
-      <SafeAreaView className="flex-1 bg-white">
-        <View className="flex-row items-center justify-between px-6 py-4 border-b border-slate-100">
-          <Text className="text-lg font-bold text-slate-900">
-            Account Summary
-          </Text>
+      <View style={[styles.screen, { paddingTop: insets.top + 10 }]}>
+        <View style={styles.header}>
+          <View style={styles.identity}>
+            <Text style={[styles.title, typeface(font.bold, "700")]}>
+              Payment summary
+            </Text>
+            <Text
+              style={[styles.subtitle, typeface(font.medium, "500")]}
+              numberOfLines={1}
+            >
+              {summary?.customerName ?? "Customer account"}
+            </Text>
+          </View>
           <TouchableOpacity
             onPress={onClose}
-            className="p-2 bg-slate-50 rounded-full"
+            style={styles.close}
+            accessibilityLabel="Close summary"
           >
-            <X size={20} color="#64748b" />
+            <X size={18} color={INK} />
           </TouchableOpacity>
         </View>
 
         {isLoading ? (
-          <View className="flex-1 items-center justify-center">
-            <ActivityIndicator size="large" color="#3b82f6" />
+          <View style={styles.loader}>
+            <ActivityIndicator size="large" color={TINT} />
           </View>
         ) : summary ? (
-          <ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
-            {/* Customer Profile Header */}
-            <View className="p-6 bg-slate-50/50">
-              <View className="flex-row items-center gap-3 mb-1">
-                <User size={20} color="#3b82f6" />
-                <Text className="text-xl font-bold text-slate-900">
-                  {summary.customerName}
-                </Text>
-              </View>
-              <Text className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
-                Contact: {summary.contactInfo || "N/A"}
+          <ScrollView
+            contentContainerStyle={[
+              styles.body,
+              { paddingBottom: Math.max(insets.bottom, 28) },
+            ]}
+            showsVerticalScrollIndicator={false}
+          >
+            <View style={styles.profile}>
+              <Text
+                style={[styles.customer, typeface(font.bold, "700")]}
+                numberOfLines={1}
+              >
+                {summary.customerName}
               </Text>
-
-              {/* Debt Card */}
-              <View className="mt-6 p-6 bg-white rounded-3xl border border-slate-100 shadow-sm">
-                <Text className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">
-                  Current Outstanding Balance
-                </Text>
-                <Text className="text-3xl font-black text-rose-600">
-                  {formatPHP(summary.totalDebt)}
-                </Text>
-              </View>
+              <Text style={[styles.contact, typeface(font.medium, "500")]}>
+                {summary.contactInfo || "No contact"}
+              </Text>
             </View>
 
-            <View className="p-6 space-y-8">
-              {/* Purchase History */}
-              <View>
-                <View className="flex-row items-center gap-2 mb-4">
-                  <ShoppingBag size={18} color="#0f172a" />
-                  <Text className="text-sm font-bold text-slate-900 uppercase tracking-tight">
-                    Purchase History
-                  </Text>
-                </View>
+            <View
+              style={[
+                styles.balance,
+                { backgroundColor: settled ? "#E7F8EE" : "#FDE6D4" },
+              ]}
+            >
+              <Text style={[styles.balanceLabel, typeface(font.medium, "500")]}>
+                Outstanding
+              </Text>
+              <Text
+                style={[
+                  styles.balanceValue,
+                  { color: settled ? GREEN : AMBER },
+                  typeface(font.bold, "700"),
+                ]}
+              >
+                {settled ? "Settled" : formatPHP(summary.totalDebt)}
+              </Text>
+            </View>
 
-                <View className="gap-y-3">
-                  {summary.creditPurchases.map((p) => (
-                    <View
-                      key={p.id}
-                      className="p-4 rounded-2xl border border-slate-50 bg-slate-50/50"
-                    >
-                      <View className="flex-row justify-between items-start mb-1">
-                        <Text className="text-sm font-bold text-slate-800">
-                          {formatPHP(p.totalAmount)}
+            <Text style={[styles.section, typeface(font.bold, "700")]}>
+              Purchases
+            </Text>
+            {summary.creditPurchases.length === 0 ? (
+              <Text style={[styles.empty, typeface(font.regular, "400")]}>
+                No purchases recorded
+              </Text>
+            ) : (
+              <View style={styles.list}>
+                {summary.creditPurchases.map((purchase, index) => (
+                  <View key={purchase.id}>
+                    {index > 0 ? <View style={styles.hairline} /> : null}
+                    <View style={styles.row}>
+                      <View style={styles.rowBody}>
+                        <Text
+                          style={[styles.rowName, typeface(font.semibold, "600")]}
+                        >
+                          {purchase.itemCount}{" "}
+                          {purchase.itemCount === 1 ? "item" : "items"}
                         </Text>
-                        <View className="bg-white border border-slate-200 px-2 py-0.5 rounded-lg">
-                          <Text className="text-[10px] font-bold text-slate-500">
-                            {p.itemCount} items
-                          </Text>
-                        </View>
-                      </View>
-                      <View className="flex-row items-center gap-1.5">
-                        <Calendar size={12} color="#94a3b8" />
-                        <Text className="text-[11px] text-slate-400">
-                          {formatDate(p.transactionDate)}
-                        </Text>
-                      </View>
-                    </View>
-                  ))}
-                  {summary.creditPurchases.length === 0 && (
-                    <Text className="text-slate-400 text-xs italic">
-                      No purchases recorded.
-                    </Text>
-                  )}
-                </View>
-              </View>
-
-              {/* Payment Trail */}
-              <View>
-                <View className="flex-row items-center gap-2 mb-4">
-                  <ArrowDownLeft size={18} color="#10b981" />
-                  <Text className="text-sm font-bold text-slate-900 uppercase tracking-tight">
-                    Payment Trail
-                  </Text>
-                </View>
-
-                <View className="gap-y-3 pb-10">
-                  {summary.paymentHistory.map((pmt) => (
-                    <View
-                      key={pmt.id}
-                      className="flex-row items-center justify-between p-4 rounded-2xl border border-emerald-50 bg-emerald-50/30"
-                    >
-                      <View>
-                        <Text className="text-[10px] text-slate-400 mb-1">
-                          {formatDate(pmt.paymentDate)}
-                        </Text>
-                        <Text className="text-sm font-bold text-slate-800">
-                          Payment Received
+                        <Text
+                          style={[styles.rowMeta, typeface(font.medium, "500")]}
+                        >
+                          {formatDate(purchase.transactionDate)}
                         </Text>
                       </View>
-                      <Text className="text-sm font-bold text-emerald-600">
-                        {formatPHP(pmt.amount)}
+                      <Text
+                        style={[styles.rowAmount, typeface(font.semibold, "600")]}
+                      >
+                        {formatPHP(purchase.totalAmount)}
                       </Text>
                     </View>
-                  ))}
-                  {summary.paymentHistory.length === 0 && (
-                    <Text className="text-slate-400 text-xs italic">
-                      No payments recorded yet.
-                    </Text>
-                  )}
-                </View>
+                  </View>
+                ))}
               </View>
-            </View>
+            )}
+
+            <Text style={[styles.section, typeface(font.bold, "700")]}>
+              Payments
+            </Text>
+            {summary.paymentHistory.length === 0 ? (
+              <Text style={[styles.empty, typeface(font.regular, "400")]}>
+                No payments recorded yet
+              </Text>
+            ) : (
+              <View style={styles.list}>
+                {summary.paymentHistory.map((payment, index) => (
+                  <View key={payment.id}>
+                    {index > 0 ? <View style={styles.hairline} /> : null}
+                    <View style={[styles.row, styles.payRow]}>
+                      <View style={styles.rowFill} />
+                      <View style={styles.rowBody}>
+                        <Text
+                          style={[styles.rowName, typeface(font.semibold, "600")]}
+                        >
+                          Payment received
+                        </Text>
+                        <Text
+                          style={[styles.rowMeta, typeface(font.medium, "500")]}
+                        >
+                          {formatDate(payment.paymentDate)}
+                        </Text>
+                      </View>
+                      <Text
+                        style={[
+                          styles.payAmount,
+                          typeface(font.semibold, "600"),
+                        ]}
+                      >
+                        {formatPHP(payment.amount)}
+                      </Text>
+                    </View>
+                  </View>
+                ))}
+              </View>
+            )}
           </ScrollView>
         ) : null}
-      </SafeAreaView>
+      </View>
     </Modal>
   );
 }
+
+const styles = StyleSheet.create({
+  screen: {
+    flex: 1,
+    backgroundColor: "#FAFBFD",
+  },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 22,
+    marginBottom: 16,
+  },
+  identity: {
+    flex: 1,
+    marginRight: 12,
+    minWidth: 0,
+  },
+  title: {
+    fontSize: 20,
+    color: INK,
+    letterSpacing: -0.4,
+  },
+  subtitle: {
+    marginTop: 3,
+    fontSize: 13,
+    color: MUTED,
+  },
+  close: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: "#EEF1F6",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  loader: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  body: {
+    paddingHorizontal: 22,
+  },
+  profile: {
+    marginBottom: 12,
+  },
+  customer: {
+    fontSize: 18,
+    color: INK,
+    letterSpacing: -0.3,
+  },
+  contact: {
+    marginTop: 4,
+    fontSize: 13,
+    color: MUTED,
+  },
+  balance: {
+    borderRadius: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    marginBottom: 8,
+  },
+  balanceLabel: {
+    fontSize: 13,
+    color: MUTED,
+  },
+  balanceValue: {
+    marginTop: 6,
+    fontSize: 24,
+    letterSpacing: -0.4,
+    fontVariant: ["tabular-nums"],
+  },
+  section: {
+    marginTop: 22,
+    marginBottom: 8,
+    fontSize: 13,
+    color: INK,
+    letterSpacing: 0.8,
+    textTransform: "uppercase",
+  },
+  list: {
+    backgroundColor: "#F4F6FA",
+    borderRadius: 16,
+    overflow: "hidden",
+  },
+  row: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+  },
+  payRow: {
+    overflow: "hidden",
+  },
+  rowFill: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "#E7F8EE",
+  },
+  rowBody: {
+    flex: 1,
+    marginRight: 12,
+    minWidth: 0,
+    zIndex: 1,
+  },
+  rowName: {
+    fontSize: 15,
+    color: INK,
+  },
+  rowMeta: {
+    marginTop: 3,
+    fontSize: 12,
+    color: MUTED,
+  },
+  rowAmount: {
+    fontSize: 15,
+    color: TINT,
+    fontVariant: ["tabular-nums"],
+    zIndex: 1,
+  },
+  payAmount: {
+    fontSize: 15,
+    color: GREEN,
+    fontVariant: ["tabular-nums"],
+    zIndex: 1,
+  },
+  hairline: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: LINE,
+    marginLeft: 14,
+  },
+  empty: {
+    fontSize: 14,
+    color: MUTED,
+    paddingVertical: 8,
+  },
+});

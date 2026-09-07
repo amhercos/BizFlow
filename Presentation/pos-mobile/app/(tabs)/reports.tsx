@@ -141,10 +141,7 @@ export default function RecordsScreen(): ReactElement {
     () => buildReportSeries(period, chartTransactions),
     [period, chartTransactions],
   );
-  const mix = useMemo(
-    () => tenderMix(chartTransactions),
-    [chartTransactions],
-  );
+  const mix = useMemo(() => tenderMix(chartTransactions), [chartTransactions]);
   const peak = useMemo(
     () => peakPoint(series, chartMetric),
     [series, chartMetric],
@@ -173,7 +170,7 @@ export default function RecordsScreen(): ReactElement {
         contentContainerStyle={{
           paddingTop: insets.top + 10,
           paddingHorizontal: 22,
-          paddingBottom: 110,
+          paddingBottom: 28,
         }}
         keyboardShouldPersistTaps="handled"
         refreshControl={
@@ -197,14 +194,17 @@ export default function RecordsScreen(): ReactElement {
           <TouchableOpacity
             onPress={refresh}
             disabled={loading}
-            style={styles.iconBtn}
+            style={styles.headerBtn}
             accessibilityLabel="Refresh reports"
           >
             <RefreshCcw
-              size={18}
-              color={loading ? "#CBD5E1" : INK}
-              strokeWidth={1.8}
+              size={14}
+              color={loading ? "#93C5FD" : TINT}
+              strokeWidth={2}
             />
+            <Text style={[styles.headerBtnText, typeface(font.semibold, "600")]}>
+              Refresh
+            </Text>
           </TouchableOpacity>
         </View>
 
@@ -232,13 +232,15 @@ export default function RecordsScreen(): ReactElement {
         </View>
 
         {loading && !summary ? (
-          <View style={{ marginTop: 8 }}>
+          <View style={styles.heroCard}>
             <Skeleton colorMode="light" width={140} height={14} radius={6} />
             <View style={{ height: 12 }} />
             <Skeleton colorMode="light" width={240} height={38} radius={8} />
+            <View style={{ height: 18 }} />
+            <Skeleton colorMode="light" width="100%" height={168} radius={16} />
           </View>
         ) : (
-          <>
+          <View style={styles.heroCard}>
             <Text style={[styles.kicker, typeface(font.medium, "500")]}>
               {periodKicker(period)}
             </Text>
@@ -249,71 +251,72 @@ export default function RecordsScreen(): ReactElement {
             >
               {formatPHP(summary?.totalRevenue ?? 0)}
             </Text>
-          </>
+
+            <View style={styles.chartHead}>
+              <Text style={[styles.listTitle, typeface(font.bold, "700")]}>
+                {chartCaption(period)}
+              </Text>
+              <View style={styles.metricToggle}>
+                {(["sales", "orders"] as ChartMetric[]).map((item) => {
+                  const active = chartMetric === item;
+                  return (
+                    <Pressable
+                      key={item}
+                      onPress={() => {
+                        setChartMetric(item);
+                        void Haptics.selectionAsync();
+                      }}
+                      style={[styles.metricChip, active && styles.metricChipOn]}
+                    >
+                      <Text
+                        style={[
+                          styles.metricChipText,
+                          active && styles.metricChipTextOn,
+                          typeface(font.medium, "500"),
+                        ]}
+                      >
+                        {item === "sales" ? "Sales" : "Orders"}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </View>
+
+            {analyticsLoading && chartTransactions.length === 0 ? (
+              <View style={{ marginTop: 12 }}>
+                <Skeleton colorMode="light" width="100%" height={168} radius={16} />
+              </View>
+            ) : (
+              <WeekBarChart
+                variant="hero"
+                values={chartValues}
+                labels={series.map((point) => point.label)}
+                selected={Math.min(selectedBar, Math.max(series.length - 1, 0))}
+                onSelect={(index) => {
+                  setSelectedBar(index);
+                  void Haptics.selectionAsync();
+                }}
+                formatValue={
+                  chartMetric === "sales" ? compactPHP : (value) => String(value)
+                }
+                fontFamily={font.semibold}
+              />
+            )}
+
+            {peak && (chartMetric === "sales" ? peak.sales : peak.orders) > 0 ? (
+              <Text style={[styles.insight, typeface(font.medium, "500")]}>
+                Busiest {peak.label}
+                {" · "}
+                {chartMetric === "sales"
+                  ? compactPHP(peak.sales)
+                  : `${peak.orders} orders`}
+              </Text>
+            ) : null}
+          </View>
         )}
 
-        <View style={styles.chartHead}>
-          <Text style={[styles.listTitle, typeface(font.bold, "700")]}>
-            {chartCaption(period)}
-          </Text>
-          <View style={styles.metricToggle}>
-            {(["sales", "orders"] as ChartMetric[]).map((item) => {
-              const active = chartMetric === item;
-              return (
-                <Pressable
-                  key={item}
-                  onPress={() => {
-                    setChartMetric(item);
-                    void Haptics.selectionAsync();
-                  }}
-                  style={[styles.metricChip, active && styles.metricChipOn]}
-                >
-                  <Text
-                    style={[
-                      styles.metricChipText,
-                      active && styles.metricChipTextOn,
-                      typeface(font.medium, "500"),
-                    ]}
-                  >
-                    {item === "sales" ? "Sales" : "Orders"}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </View>
-        </View>
-
-        {analyticsLoading && chartTransactions.length === 0 ? (
-          <View style={{ marginTop: 12 }}>
-            <Skeleton colorMode="light" width="100%" height={168} radius={16} />
-          </View>
-        ) : (
-          <WeekBarChart
-            values={chartValues}
-            labels={series.map((point) => point.label)}
-            selected={Math.min(selectedBar, Math.max(series.length - 1, 0))}
-            onSelect={(index) => {
-              setSelectedBar(index);
-              void Haptics.selectionAsync();
-            }}
-            formatValue={
-              chartMetric === "sales" ? compactPHP : (value) => String(value)
-            }
-            fontFamily={font.semibold}
-          />
-        )}
-
-        {peak && (chartMetric === "sales" ? peak.sales : peak.orders) > 0 ? (
-          <Text style={[styles.insight, typeface(font.medium, "500")]}>
-            Busiest {peak.label}
-            {" · "}
-            {chartMetric === "sales"
-              ? compactPHP(peak.sales)
-              : `${peak.orders} orders`}
-          </Text>
-        ) : null}
-
-        <TenderMixBar mix={mix} font={font} />
+        <TenderMixBar mix={mix} font={font} insight />
 
         <View style={styles.washes}>
           <View style={[styles.wash, { backgroundColor: "#EAF8D8" }]}>
@@ -330,7 +333,10 @@ export default function RecordsScreen(): ReactElement {
             <Text style={[styles.washLabel, typeface(font.medium, "500")]}>
               Avg ticket
             </Text>
-            <Text style={[styles.washValue, typeface(font.bold, "700")]}>
+            <Text
+              style={[styles.washValue, styles.washMoney, typeface(font.bold, "700")]}
+              numberOfLines={1}
+            >
               {loading && !summary ? "—" : formatPHP(avgTicket)}
             </Text>
           </View>
@@ -338,7 +344,8 @@ export default function RecordsScreen(): ReactElement {
 
         {topProduct ? (
           <View style={styles.topRow}>
-            <View>
+            <View style={styles.topFill} />
+            <View style={styles.topBody}>
               <Text style={[styles.topLabel, typeface(font.medium, "500")]}>
                 Top product
               </Text>
@@ -473,7 +480,8 @@ const styles = StyleSheet.create({
   identity: {
     flex: 1,
     marginLeft: 12,
-    marginRight: 12,
+    marginRight: 8,
+    minWidth: 0,
   },
   title: {
     fontSize: 20,
@@ -485,11 +493,18 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: MUTED,
   },
-  iconBtn: {
-    width: 40,
-    height: 40,
+  headerBtn: {
+    height: 32,
+    paddingHorizontal: 10,
+    borderRadius: 10,
+    backgroundColor: "#DCEBFF",
+    flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
+    gap: 5,
+  },
+  headerBtnText: {
+    fontSize: 12,
+    color: TINT,
   },
   segment: {
     flexDirection: "row",
@@ -516,13 +531,20 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
   },
   kicker: {
-    fontSize: 14,
+    fontSize: 13,
     color: MUTED,
+  },
+  heroCard: {
+    backgroundColor: "#F3F7FF",
+    borderRadius: 22,
+    paddingHorizontal: 14,
+    paddingTop: 16,
+    paddingBottom: 12,
   },
   hero: {
     marginTop: 4,
     fontSize: 36,
-    color: INK,
+    color: TINT,
     letterSpacing: -1.2,
     fontVariant: ["tabular-nums"],
   },
@@ -530,7 +552,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    marginTop: 28,
+    marginTop: 16,
     marginBottom: 4,
   },
   metricToggle: {
@@ -561,47 +583,68 @@ const styles = StyleSheet.create({
   },
   washes: {
     flexDirection: "row",
-    gap: 12,
-    marginTop: 28,
+    gap: 8,
+    marginTop: 16,
   },
   wash: {
     flex: 1,
-    borderRadius: 22,
-    paddingHorizontal: 16,
-    paddingVertical: 18,
+    borderRadius: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
   },
   washLabel: {
-    fontSize: 13,
+    fontSize: 11,
     color: INK,
     opacity: 0.65,
   },
   washValue: {
-    marginTop: 10,
-    fontSize: 20,
+    marginTop: 6,
+    fontSize: 18,
     color: INK,
     letterSpacing: -0.4,
     fontVariant: ["tabular-nums"],
   },
+  washMoney: {
+    color: TINT,
+  },
   topRow: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
-    marginTop: 22,
-    paddingVertical: 4,
+    marginTop: 16,
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    overflow: "hidden",
+    backgroundColor: "#F8FAFC",
+  },
+  topFill: {
+    position: "absolute",
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: "72%",
+    backgroundColor: "#DCEBFF",
+    borderRadius: 12,
+  },
+  topBody: {
+    flex: 1,
+    marginRight: 12,
+    zIndex: 1,
   },
   topLabel: {
-    fontSize: 13,
+    fontSize: 11,
     color: MUTED,
   },
   topName: {
-    marginTop: 4,
-    fontSize: 16,
+    marginTop: 2,
+    fontSize: 15,
     color: INK,
   },
   topMeta: {
-    fontSize: 13,
-    color: MUTED,
+    fontSize: 12,
+    color: "#15803D",
     fontVariant: ["tabular-nums"],
+    zIndex: 1,
   },
   search: {
     flexDirection: "row",
@@ -654,7 +697,7 @@ const styles = StyleSheet.create({
     textTransform: "uppercase",
   },
   chip: {
-    backgroundColor: "#E8EEF8",
+    backgroundColor: "#DCEBFF",
     paddingHorizontal: 10,
     paddingVertical: 5,
     borderRadius: 999,

@@ -5,7 +5,6 @@ import { StyleSheet, Text, View } from "react-native";
 
 const INK = "#0F172A";
 const MUTED = "#64748B";
-const TEAL = "#0F9F8A";
 const TINT = "#2563EB";
 
 function formatPHP(amount: number) {
@@ -15,84 +14,118 @@ function formatPHP(amount: number) {
   })}`;
 }
 
+function mixLine(mix: TenderMix, empty: boolean) {
+  if (empty) return "Waiting on the first sale of the week";
+  if (mix.cashPct >= 70) return "Cash is carrying the week";
+  if (mix.creditPct >= 70) return "Credit is doing most of the work";
+  if (Math.abs(mix.cashPct - 50) <= 8) return "Cash and credit are neck and neck";
+  return mix.cashPct > mix.creditPct
+    ? "Cash still has the edge"
+    : "Credit has the edge";
+}
+
 export const TenderMixBar = memo(function TenderMixBar({
   mix,
   font = {},
+  insight = false,
 }: {
   mix: TenderMix;
   font?: AppFonts;
+  insight?: boolean;
 }) {
   const empty = mix.cash + mix.credit <= 0;
+  const rows = [
+    {
+      label: "Cash",
+      amount: mix.cash,
+      pct: mix.cashPct,
+      fill: "#D8F3E7",
+      accent: "#0F9F8A",
+    },
+    {
+      label: "Credit",
+      amount: mix.credit,
+      pct: mix.creditPct,
+      fill: "#DCEBFF",
+      accent: TINT,
+    },
+  ] as const;
 
   return (
     <View style={styles.wrap}>
-      <View style={styles.legend}>
-        <Text style={[styles.side, typeface(font.medium, "500")]}>
-          Cash {empty ? "—" : `${mix.cashPct}%`}
+      {insight ? (
+        <Text style={[styles.insight, typeface(font.medium, "500")]}>
+          {mixLine(mix, empty)}
         </Text>
-        <Text style={[styles.side, typeface(font.medium, "500")]}>
-          Credit {empty ? "—" : `${mix.creditPct}%`}
-        </Text>
-      </View>
-      <View style={styles.track}>
-        {empty ? (
-          <View style={[styles.fill, { flex: 1, backgroundColor: "#E8EDF4" }]} />
-        ) : (
-          <>
-            <View
+      ) : null}
+
+      {rows.map((row) => (
+        <View key={row.label} style={styles.gauge}>
+          <View
+            style={[
+              styles.gaugeFill,
+              {
+                width: empty ? "0%" : `${Math.max(row.pct, 8)}%`,
+                backgroundColor: row.fill,
+              },
+            ]}
+          />
+          <View style={styles.gaugeText}>
+            <Text style={[styles.label, typeface(font.medium, "500")]}>
+              {row.label}
+            </Text>
+            <Text
               style={[
-                styles.fill,
-                { flex: Math.max(mix.cashPct, 1), backgroundColor: TEAL },
+                styles.amount,
+                { color: empty ? MUTED : row.accent },
+                typeface(font.semibold, "600"),
               ]}
-            />
-            <View
-              style={[
-                styles.fill,
-                { flex: Math.max(mix.creditPct, 1), backgroundColor: TINT },
-              ]}
-            />
-          </>
-        )}
-      </View>
-      <View style={styles.legend}>
-        <Text style={[styles.amount, typeface(font.semibold, "600")]}>
-          {empty ? "₱0" : formatPHP(mix.cash)}
-        </Text>
-        <Text style={[styles.amount, typeface(font.semibold, "600")]}>
-          {empty ? "₱0" : formatPHP(mix.credit)}
-        </Text>
-      </View>
+            >
+              {empty ? "—" : `${formatPHP(row.amount)} · ${row.pct}%`}
+            </Text>
+          </View>
+        </View>
+      ))}
     </View>
   );
 });
 
 const styles = StyleSheet.create({
   wrap: {
-    marginTop: 22,
+    marginTop: 18,
+    gap: 8,
   },
-  legend: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-  },
-  side: {
+  insight: {
     fontSize: 13,
     color: MUTED,
+    marginBottom: 2,
   },
-  track: {
-    flexDirection: "row",
-    height: 6,
-    borderRadius: 99,
+  gauge: {
+    height: 42,
+    borderRadius: 12,
+    backgroundColor: "#F4F6FA",
     overflow: "hidden",
-    backgroundColor: "#E8EDF4",
-    marginTop: 8,
-    marginBottom: 8,
+    justifyContent: "center",
   },
-  fill: {
-    height: "100%",
+  gaugeFill: {
+    position: "absolute",
+    left: 0,
+    top: 0,
+    bottom: 0,
+    borderRadius: 12,
+  },
+  gaugeText: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 14,
+  },
+  label: {
+    fontSize: 13,
+    color: INK,
   },
   amount: {
     fontSize: 13,
-    color: INK,
     fontVariant: ["tabular-nums"],
   },
 });

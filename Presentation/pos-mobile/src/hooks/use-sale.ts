@@ -13,29 +13,43 @@ import {
 import { isAxiosError, type AxiosError } from "axios";
 import { useCallback, useMemo, useState } from "react";
 import { Alert } from "react-native";
-import { calculateLineTotal } from "../utils/promotion-engine";
+import { usePromotions } from "./use-promotions";
+import {
+  calculateLineTotal,
+  toAppliedPromotion,
+  withLivePromotions,
+} from "../utils/promotion-engine";
 
 export function useSale() {
   const [basket, setBasket] = useState<BasketItem[]>([]);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+  const { promotions } = usePromotions();
 
-  // Real-time calculation engine cache memoized
+  const pricedBasket = useMemo(
+    () => basket.map((item) => withLivePromotions(item, promotions)),
+    [basket, promotions],
+  );
+
   const totals = useMemo(() => {
     let originalTotalAmount = 0;
     let cashDiscountedAmount = 0;
-    const appliedNames: string[] = [];
+    const promoSavings = new Map<string, number>();
 
-    basket.forEach((item) => {
-      const lineCalculations = calculateLineTotal(item, basket);
+    pricedBasket.forEach((item) => {
+      const lineCalculations = calculateLineTotal(item, pricedBasket);
       originalTotalAmount += lineCalculations.originalTotal;
       cashDiscountedAmount += lineCalculations.discountedTotal;
 
-      if (lineCalculations.appliedPromotionName) {
-        appliedNames.push(lineCalculations.appliedPromotionName);
+      if (lineCalculations.appliedPromotionName && lineCalculations.savings > 0) {
+        const key = lineCalculations.appliedPromotionName;
+        promoSavings.set(
+          key,
+          (promoSavings.get(key) ?? 0) + lineCalculations.savings,
+        );
       }
     });
 
-    const creditTotalAmount = basket.reduce(
+    const creditTotalAmount = pricedBasket.reduce(
       (acc, item) => acc + item.unitPrice * item.quantity,
       0,
     );
@@ -48,9 +62,12 @@ export function useSale() {
         Math.max(0, originalTotalAmount - cashDiscountedAmount),
         2,
       ),
-      promotionsApplied: Array.from(new Set(appliedNames)).join(", ") || null,
+      promotionsApplied: Array.from(promoSavings, ([name, savings]) => ({
+        name,
+        savings: roundTo(savings, 2),
+      })),
     };
-  }, [basket]);
+  }, [pricedBasket]);
 
   const addToBasket = useCallback(
     (product: Product, unitType: UnitType = UnitType.Piece): void => {
@@ -104,7 +121,7 @@ export function useSale() {
             piecesPerPack: product.piecesPerPack || 1,
             packPrice: product.packPrice || 0,
             retailPrice: product.price,
-            promotions: product.promotions,
+            promotions: (product.promotions ?? []).map(toAppliedPromotion),
           },
         ];
       });
@@ -166,7 +183,7 @@ export function useSale() {
 
     try {
       const command: CreateTransactionCommand = {
-        items: basket.map((item) => {
+        items: pricedBasket.map((item) => {
           const isPack = item.unitType === UnitType.Pack;
 
           if (isCredit) {
@@ -180,7 +197,7 @@ export function useSale() {
             };
           }
 
-          const { discountedTotal } = calculateLineTotal(item, basket);
+          const { discountedTotal } = calculateLineTotal(item, pricedBasket);
           return {
             productId: item.productId,
             quantity: item.quantity,
@@ -216,7 +233,7 @@ export function useSale() {
   };
 
   return {
-    basket,
+    basket: pricedBasket,
     totals,
     addToBasket,
     removeItem,

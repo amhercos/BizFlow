@@ -1,4 +1,5 @@
 import { type CustomerCredit } from "@/src/types/credit";
+import type { AppliedPromoLine } from "@/src/types/promotion";
 import { PaymentType, UnitType, type BasketItem } from "@/src/types/sale";
 import React, { Dispatch, SetStateAction } from "react";
 import {
@@ -41,7 +42,7 @@ interface TransactionModalProps {
     cashTotal: number;
     creditTotal: number;
     savings: number;
-    promotionsApplied: string | null;
+    promotionsApplied: AppliedPromoLine[];
   };
 }
 
@@ -72,6 +73,6 @@ export const TransactionModal: React.FC<TransactionModalProps> = (props) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#fff",
+    backgroundColor: "#FAFBFD",
   },
 });

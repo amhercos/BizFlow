@@ -1,86 +1,201 @@
 import { formatPHP } from "@/src/lib/math";
-import { PromotionCalculationResponse } from "@/src/types/promotion";
+import { typeface, useInter } from "@/src/theme/typography";
+import type { AppliedPromoLine } from "@/src/types/promotion";
 import React from "react";
-import { ActivityIndicator, Text, View } from "react-native";
+import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
+
+const INK = "#0F172A";
+const MUTED = "#64748B";
+const LINE = "rgba(15, 23, 42, 0.08)";
 
 interface BillDetailsProps {
-  calcResult: PromotionCalculationResponse;
+  originalTotal: number;
+  discountedTotal: number;
   isCalculating: boolean;
-  amountTendered?: number; // Added to receive the customer's payment amount
+  amountTendered?: number;
+  promotions?: AppliedPromoLine[];
 }
 
 export const BillDetails: React.FC<BillDetailsProps> = ({
-  calcResult,
+  originalTotal,
+  discountedTotal,
   isCalculating,
   amountTendered = 0,
+  promotions = [],
 }) => {
-  // Calculate change (ensure it doesn't show negative change if they haven't paid enough yet)
+  const font = useInter();
   const change =
-    amountTendered > calcResult.discountedTotal
-      ? amountTendered - calcResult.discountedTotal
+    amountTendered > discountedTotal ? amountTendered - discountedTotal : 0;
+  const short =
+    amountTendered > 0 && amountTendered < discountedTotal
+      ? discountedTotal - amountTendered
       : 0;
 
   return (
-    <View className="p-5 bg-white">
-      <View className="flex-row justify-between mb-2">
-        <Text className="text-slate-500 font-bold text-xs uppercase tracking-tight">
+    <View style={styles.wrap}>
+      <View style={styles.row}>
+        <Text style={[styles.label, typeface(font.medium, "500")]}>
           Subtotal
         </Text>
-        <Text className="text-slate-700 font-bold">
-          {formatPHP(calcResult.originalTotal)}
+        <Text style={[styles.value, typeface(font.medium, "500")]}>
+          {formatPHP(originalTotal)}
         </Text>
       </View>
 
-      {calcResult.savings > 0 && (
-        <View className="flex-row justify-between mb-2">
-          <Text className="text-emerald-600 font-bold text-xs uppercase tracking-tight">
-            Promo: {calcResult.appliedPromotionName || "Applied"}
+      {promotions.length > 0 ? (
+        <View style={styles.promoBlock}>
+          <Text style={[styles.promoHeading, typeface(font.semibold, "600")]}>
+            Promos
           </Text>
-          <Text className="text-emerald-600 font-bold">
-            - {formatPHP(calcResult.savings)}
-          </Text>
+          {promotions.map((promo) => (
+            <View key={promo.name} style={styles.promoRow}>
+              <Text
+                numberOfLines={2}
+                style={[styles.promoName, typeface(font.medium, "500")]}
+              >
+                {promo.name}
+              </Text>
+              <Text style={[styles.promoValue, typeface(font.semibold, "600")]}>
+                −{formatPHP(promo.savings)}
+              </Text>
+            </View>
+          ))}
         </View>
-      )}
+      ) : null}
 
-      <View className="h-[1px] bg-slate-100 my-3" />
+      <View style={styles.hairline} />
 
-      <View className="flex-row justify-between items-center">
-        <Text className="text-slate-900 font-black text-sm uppercase">
-          Grand Total
+      <View style={styles.row}>
+        <Text style={[styles.totalLabel, typeface(font.semibold, "600")]}>
+          Total due
         </Text>
         {isCalculating ? (
-          <ActivityIndicator size="small" color="#10b981" />
+          <ActivityIndicator size="small" color="#2563EB" />
         ) : (
-          <Text className="text-2xl font-black text-emerald-600">
-            {formatPHP(calcResult.discountedTotal)}
+          <Text style={[styles.total, typeface(font.bold, "700")]}>
+            {formatPHP(discountedTotal)}
           </Text>
         )}
       </View>
 
-      {/* Change Computation Section */}
-      {amountTendered > 0 && (
+      {amountTendered > 0 ? (
         <>
-          <View className="h-[1px] border-t border-dashed border-slate-200 my-3" />
-
-          <View className="flex-row justify-between mb-2">
-            <Text className="text-slate-500 font-bold text-xs uppercase tracking-tight">
-              Cash Given
+          <View style={styles.row}>
+            <Text style={[styles.label, typeface(font.medium, "500")]}>
+              Cash given
             </Text>
-            <Text className="text-slate-700 font-bold">
+            <Text style={[styles.value, typeface(font.medium, "500")]}>
               {formatPHP(amountTendered)}
             </Text>
           </View>
-
-          <View className="flex-row justify-between items-center">
-            <Text className="text-slate-900 font-black text-sm uppercase">
-              Change
-            </Text>
-            <Text className="text-xl font-black text-blue-600">
-              {formatPHP(change)}
-            </Text>
-          </View>
+          {short > 0 ? (
+            <View style={styles.row}>
+              <Text style={[styles.shortLabel, typeface(font.semibold, "600")]}>
+                Short
+              </Text>
+              <Text style={[styles.short, typeface(font.bold, "700")]}>
+                {formatPHP(short)}
+              </Text>
+            </View>
+          ) : (
+            <View style={styles.row}>
+              <Text style={[styles.totalLabel, typeface(font.semibold, "600")]}>
+                Change
+              </Text>
+              <Text style={[styles.change, typeface(font.bold, "700")]}>
+                {formatPHP(change)}
+              </Text>
+            </View>
+          )}
         </>
-      )}
+      ) : null}
     </View>
   );
 };
+
+const styles = StyleSheet.create({
+  wrap: {
+    paddingHorizontal: 22,
+    paddingTop: 12,
+    paddingBottom: 8,
+  },
+  row: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: 12,
+    marginBottom: 8,
+  },
+  label: {
+    fontSize: 13,
+    color: MUTED,
+  },
+  value: {
+    fontSize: 14,
+    color: INK,
+    fontVariant: ["tabular-nums"],
+  },
+  promoBlock: {
+    marginTop: 2,
+    marginBottom: 4,
+    backgroundColor: "rgba(22, 163, 74, 0.08)",
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingTop: 8,
+    paddingBottom: 6,
+  },
+  promoHeading: {
+    fontSize: 11,
+    color: "#15803D",
+    letterSpacing: 0.4,
+    textTransform: "uppercase",
+    marginBottom: 6,
+  },
+  promoRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    gap: 12,
+    paddingVertical: 4,
+  },
+  promoName: {
+    flex: 1,
+    fontSize: 13,
+    color: "#166534",
+    lineHeight: 18,
+  },
+  promoValue: {
+    fontSize: 13,
+    color: "#15803D",
+    fontVariant: ["tabular-nums"],
+  },
+  hairline: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: LINE,
+    marginVertical: 8,
+  },
+  totalLabel: {
+    fontSize: 15,
+    color: INK,
+  },
+  total: {
+    fontSize: 22,
+    color: INK,
+    letterSpacing: -0.4,
+    fontVariant: ["tabular-nums"],
+  },
+  change: {
+    fontSize: 18,
+    color: "#2563EB",
+    fontVariant: ["tabular-nums"],
+  },
+  shortLabel: {
+    fontSize: 15,
+    color: "#E11D48",
+  },
+  short: {
+    fontSize: 18,
+    color: "#E11D48",
+    fontVariant: ["tabular-nums"],
+  },
+});
