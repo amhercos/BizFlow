@@ -4,6 +4,7 @@ import { TenderMixBar } from "@/components/reports/TenderMixBar";
 import { useAuth } from "@/src/context/AuthContext";
 import { formatPHP } from "@/src/lib/math";
 import { tenderMix } from "@/src/lib/report-analytics";
+import { creditService } from "@/src/services/creditService";
 import { dashboardService } from "@/src/services/dashboardService";
 import { reportService } from "@/src/services/reportService";
 import { typeface, useInter } from "@/src/theme/typography";
@@ -97,20 +98,25 @@ export default function DashboardScreen() {
   const [weekTx, setWeekTx] = useState<RecentTransaction[]>([]);
   const [nearExpiry, setNearExpiry] = useState<NearExpiryProduct[]>([]);
   const [topProducts, setTopProducts] = useState<TopProduct[]>([]);
+  const [outstanding, setOutstanding] = useState(0);
 
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const [s, week, expiry, top] = await Promise.all([
+      const [s, week, expiry, top, stats] = await Promise.all([
         dashboardService.getSummary(),
         reportService.getRecentTransactions(1, 100, "weekly"),
         dashboardService.getNearExpiry(),
         reportService.getTopSelling(3),
+        creditService.getCreditStats("all").catch(() => null),
       ]);
       setSummary(s);
       setWeekTx(week);
       setNearExpiry(expiry);
       setTopProducts(top.slice(0, 3));
+      setOutstanding(
+        stats?.totalOutstanding ?? stats?.totalActiveDebts ?? 0,
+      );
     } catch (err) {
       console.error("Dashboard Load Error:", err);
     } finally {
@@ -135,12 +141,6 @@ export default function DashboardScreen() {
     previousValue && previousValue > 0
       ? ((selectedValue - previousValue) / previousValue) * 100
       : null;
-
-  const avgTicket = useMemo(() => {
-    const orders = summary?.totalTransactions ?? 0;
-    if (!orders) return 0;
-    return (summary?.totalRevenue ?? 0) / orders;
-  }, [summary]);
 
   const mix = useMemo(() => tenderMix(weekTx), [weekTx]);
   const maxSold = Math.max(...topProducts.map((p) => p.quantitySold), 1);
@@ -321,22 +321,25 @@ export default function DashboardScreen() {
             {loading ? "—" : `${summary?.totalTransactions ?? 0}`}
           </Text>
         </Pressable>
-        <View style={[styles.wash, { backgroundColor: "#DCEBFF" }]}>
+        <Pressable
+          onPress={() => router.push("/(tabs)/credits")}
+          style={[styles.wash, { backgroundColor: "#DCEBFF" }]}
+        >
           <Text style={[styles.washLabel, typeface(font.medium, "500")]}>
-            Sale
+            On credit
           </Text>
           <Text
             style={[
               styles.washValue,
-              styles.washMoney,
+              outstanding > 0 ? styles.washAlert : styles.washMoney,
               typeface(font.bold, "700"),
             ]}
             numberOfLines={1}
             adjustsFontSizeToFit
           >
-            {loading ? "—" : formatPHP(avgTicket)}
+            {loading ? "—" : formatPHP(outstanding)}
           </Text>
-        </View>
+        </Pressable>
         <Pressable
           onPress={() => router.push("/(tabs)/inventory")}
           style={[styles.wash, { backgroundColor: "#FDE6D4" }]}

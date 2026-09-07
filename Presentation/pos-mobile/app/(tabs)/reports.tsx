@@ -131,17 +131,15 @@ export default function RecordsScreen(): ReactElement {
     });
   }, [recentTransactions, searchQuery, methodFilter]);
 
-  const avgTicket = useMemo(() => {
-    const orders = summary?.totalTransactions ?? 0;
-    if (!orders) return 0;
-    return (summary?.totalRevenue ?? 0) / orders;
-  }, [summary]);
-
   const series = useMemo(
     () => buildReportSeries(period, chartTransactions),
     [period, chartTransactions],
   );
   const mix = useMemo(() => tenderMix(chartTransactions), [chartTransactions]);
+  const itemsSold = useMemo(
+    () => chartTransactions.reduce((sum, tx) => sum + (tx.itemCount || 0), 0),
+    [chartTransactions],
+  );
   const peak = useMemo(
     () => peakPoint(series, chartMetric),
     [series, chartMetric],
@@ -331,13 +329,13 @@ export default function RecordsScreen(): ReactElement {
           </View>
           <View style={[styles.wash, { backgroundColor: "#DCEBFF" }]}>
             <Text style={[styles.washLabel, typeface(font.medium, "500")]}>
-              Avg ticket
+              Items sold
             </Text>
             <Text
-              style={[styles.washValue, styles.washMoney, typeface(font.bold, "700")]}
+              style={[styles.washValue, typeface(font.bold, "700")]}
               numberOfLines={1}
             >
-              {loading && !summary ? "—" : formatPHP(avgTicket)}
+              {loading && !summary ? "—" : String(itemsSold)}
             </Text>
           </View>
         </View>
