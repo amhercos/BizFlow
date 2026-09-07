@@ -1,6 +1,5 @@
 ﻿using Application.Dto;
 using Application.Interfaces.Repositories;
-using Domain.Entities.Enums;
 using MediatR;
 using System.Linq;
 
@@ -18,6 +17,8 @@ public class GetProductsHandler(IProductRepository productRepository)
             p.Name,
             p.Description,
             p.Price,
+            p.PackPrice,
+            p.PiecesPerPack,
             p.Stock,
             p.LowStockThreshold,
             p.Category?.CategoryName ?? "No Category",
@@ -27,7 +28,7 @@ public class GetProductsHandler(IProductRepository productRepository)
             p.Promotions?.Select(promo => new PromotionDto(
                 promo.Id,
                 promo.Name,
-                promo.Type, 
+                promo.Type,
                 promo.IsActive,
                 promo.Tiers?.Select(t => new PromoTierDto(t.Quantity, t.Price)).ToList() ?? new(),
                 promo.TieUpProductId,

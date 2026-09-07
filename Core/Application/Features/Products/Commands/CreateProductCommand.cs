@@ -1,15 +1,15 @@
 ﻿using MediatR;
-using System;
-using System.Collections.Generic;
-using System.Text;
 
 namespace Application.Features.Products.Commands
 {
     public record CreateProductCommand(
-    string Name,
-    string? Description,
-    decimal Price,
-    int StockQuantity,
-    DateOnly? ExpiryDate,
-    Guid CategoryId) : IRequest<Guid>;
+        string Name,
+        decimal Price,
+        decimal? PackPrice,
+        int? PiecesPerPack,
+        int StockQuantity,
+        Guid? CategoryId,
+        string? Description,
+        DateOnly? ExpiryDate
+    ) : IRequest<Guid>;
 }

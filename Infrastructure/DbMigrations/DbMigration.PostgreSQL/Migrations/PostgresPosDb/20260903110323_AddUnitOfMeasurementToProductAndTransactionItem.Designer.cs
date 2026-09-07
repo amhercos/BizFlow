@@ -3,6 +3,7 @@ using System;
 using DbMigration.PostgreSQL;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace DbMigration.PostgreSQL.Migrations.PostgresPosDb
 {
     [DbContext(typeof(PostgresPosDbContext))]
-    partial class PostgresPosDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260903110323_AddUnitOfMeasurementToProductAndTransactionItem")]
+    partial class AddUnitOfMeasurementToProductAndTransactionItem
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder

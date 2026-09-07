@@ -29,5 +29,13 @@ public class UpdateProductCommandValidator : AbstractValidator<UpdateProductComm
         RuleFor(v => v.ExpiryDate)
             .Must(date => !date.HasValue || date.Value >= DateOnly.FromDateTime(DateTime.Now))
             .WithMessage("Expiry date cannot be in the past.");
+
+        RuleFor(v => v.PackPrice)
+            .GreaterThan(0).When(v => v.PackPrice.HasValue)
+            .WithMessage("Pack price must be greater than 0.");
+
+        RuleFor(v => v.PiecesPerPack)
+            .GreaterThan(0).When(v => v.PiecesPerPack.HasValue)
+            .WithMessage("Pieces per pack must be greater than 0.");
     }
 }

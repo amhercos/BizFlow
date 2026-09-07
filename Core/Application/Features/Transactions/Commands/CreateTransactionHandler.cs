@@ -43,35 +43,35 @@ public class CreateTransactionHandler(
                 if (!productMap.TryGetValue(itemReq.ProductId, out var product))
                     throw new Exception($"Product not found: {itemReq.ProductId}");
 
-                if (product.Stock < itemReq.Quantity)
-                    throw new Exception($"Insufficient stock for: {product.Name}. Available: {product.Stock}");
+                var isPack = itemReq.IsPack;
+                var ratio = isPack ? (product.PiecesPerPack ?? 1) : 1;
+                var basePiecesDeducted = itemReq.Quantity * ratio;
 
-                product.Stock -= itemReq.Quantity;
+                if (product.Stock < basePiecesDeducted)
+                    throw new Exception($"Insufficient stock for: {product.Name}. Required: {basePiecesDeducted} pcs, Available: {product.Stock} pcs");
+
+                product.Stock -= basePiecesDeducted;
 
                 transaction.Items.Add(new TransactionItem
                 {
                     Id = Guid.NewGuid(),
                     ProductId = product.Id,
                     Quantity = itemReq.Quantity,
-                    UnitPrice = product.Price,
+                    UnitType = isPack ? "Pack" : "Piece",
+                    ConversionRatio = ratio,
+                    UnitPrice = isPack ? (product.PackPrice ?? product.Price) : product.Price,
                     StoreId = storeId
                 });
             }
 
-            // PROMOTION LOGIC UPDATE 
             foreach (var item in transaction.Items)
             {
                 var product = productMap[item.ProductId];
 
-                if (request.PaymentType != PaymentType.Credit)
+                if (request.PaymentType != PaymentType.Credit && item.UnitType == "Piece")
                 {
                     var lineTotal = promotionEngine.CalculateLineTotal(product, item.Quantity, transaction.Items);
                     item.UnitPrice = Math.Round(lineTotal / item.Quantity, 2, MidpointRounding.AwayFromZero);
-                }
-                else
-                {
-
-                    item.UnitPrice = product.Price;
                 }
             }
 
@@ -138,7 +138,6 @@ public class CreateTransactionHandler(
         };
 
         creditRepository.Add(newAccount);
-
         await context.SaveChangesAsync(ct);
 
         return newAccount;

@@ -1,37 +1,37 @@
 import { Skeleton } from "moti/skeleton";
 import React, { FC } from "react";
-import { View } from "react-native";
+import { StyleSheet, View } from "react-native";
 
 const PromotionCardSkeleton: FC = () => {
   return (
-    <View className="bg-white rounded-3xl p-5 mb-4 shadow-sm border border-slate-50">
-      <View className="flex-row justify-between items-start mb-4">
-        <View className="flex-1 pr-4">
-          <Skeleton colorMode="light" width={80} height={20} radius={6} />
-          <View className="h-3" />
-          <Skeleton colorMode="light" width="90%" height={24} radius={8} />
-          <View className="h-2" />
-          <Skeleton colorMode="light" width="60%" height={16} radius={6} />
-        </View>
-        <Skeleton colorMode="light" width={45} height={24} radius={20} />
-      </View>
-
-      <View className="bg-slate-50 rounded-2xl p-4 mb-4">
-        <View className="flex-row justify-between items-center py-1 mb-2">
-          <Skeleton colorMode="light" width={60} height={14} />
-          <Skeleton colorMode="light" width={100} height={14} />
-        </View>
-        <View className="flex-row justify-between items-center py-1">
-          <Skeleton colorMode="light" width={60} height={14} />
-          <Skeleton colorMode="light" width={100} height={14} />
-        </View>
-      </View>
-
-      <View className="flex-row justify-end items-center">
-        <Skeleton colorMode="light" width={110} height={36} radius={12} />
-      </View>
+    <View style={styles.card}>
+      <Skeleton colorMode="light" width={64} height={16} radius={8} />
+      <View style={styles.gap} />
+      <Skeleton colorMode="light" width="70%" height={18} radius={6} />
+      <View style={styles.small} />
+      <Skeleton colorMode="light" width="40%" height={12} radius={6} />
+      <View style={styles.rule} />
+      <Skeleton colorMode="light" width="50%" height={22} radius={6} />
     </View>
   );
 };
+
+const styles = StyleSheet.create({
+  card: {
+    backgroundColor: "#F4F6FA",
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 12,
+  },
+  gap: {
+    height: 10,
+  },
+  small: {
+    height: 6,
+  },
+  rule: {
+    height: 14,
+  },
+});
 
 export default PromotionCardSkeleton;

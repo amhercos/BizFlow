@@ -11,23 +11,37 @@ namespace Infrastructure.Persistence.Configurations
             builder.HasKey(p => p.Id);
 
             builder.Property(p => p.Name)
-                   .HasMaxLength(200)
-                   .IsRequired();
+                .IsRequired()
+                .HasMaxLength(200);
 
-            builder.Property(p => p.Price).IsRequired();
-            builder.Property(p => p.Stock).HasDefaultValue(0);
+            builder.Property(p => p.Price)
+                .HasPrecision(18, 2);
 
-            builder.Ignore(p => p.Store);
+            // Pack Unit Configurations
+            builder.Property(p => p.PackPrice)
+                .HasPrecision(18, 2)
+                .IsRequired(false);
 
-        
+            builder.Property(p => p.PiecesPerPack)
+                .IsRequired(false);
+
+            builder.Property(p => p.Stock)
+                .IsRequired();
+
+            builder.Property(p => p.LowStockThreshold)
+                .HasDefaultValue(5);
+
             builder.HasOne(p => p.Category)
-                   .WithMany(c => c.Products)
-                   .HasForeignKey(p => p.CategoryId)
-                   .OnDelete(DeleteBehavior.SetNull);
+                .WithMany()
+                .HasForeignKey(p => p.CategoryId)
+                .OnDelete(DeleteBehavior.SetNull);
 
-            builder.HasIndex(p => new { p.Name, p.StoreId })
-                    .IsUnique()
-                    .HasFilter("\"IsDeleted\" = false");
+            builder.HasOne(p => p.Store)
+                .WithMany()
+                .HasForeignKey(p => p.StoreId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            builder.HasQueryFilter(p => !p.IsDeleted);
         }
     }
 }

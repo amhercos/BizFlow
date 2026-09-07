@@ -1,43 +1,43 @@
+import { typeface, useInter } from "@/src/theme/typography";
+import { PromotionType } from "@/src/types/promotion";
 import React from "react";
-import { Text, View } from "react-native";
-import { PromotionType } from "../../src/types/promotion";
+import { StyleSheet, Text, View } from "react-native";
 
 interface TypeBadgeProps {
   type: PromotionType | string;
 }
 
-const TypeBadge: React.FC<TypeBadgeProps> = ({ type }) => {
+export default function TypeBadge({ type }: TypeBadgeProps) {
+  const font = useInter();
   const isBulk = type === PromotionType.Bulk || type === "Bulk";
   const isBundle = type === PromotionType.Bundle || type === "Bundle";
   const isDiscount = type === PromotionType.Discount || type === "Discount";
 
-  let label = "Promotion";
-  let bgColor = "bg-slate-50";
-  let textColor = "text-slate-600";
-
-  if (isBulk) {
-    label = "Bulk Pricing";
-    bgColor = "bg-amber-50";
-    textColor = "text-amber-600";
-  } else if (isBundle) {
-    label = "Product Bundle";
-    bgColor = "bg-purple-50";
-    textColor = "text-purple-600";
-  } else if (isDiscount) {
-    label = "Standard Discount";
-    bgColor = "bg-emerald-50";
-    textColor = "text-emerald-600";
-  }
+  const label = isBulk
+    ? "Bulk"
+    : isBundle
+      ? "Bundle"
+      : isDiscount
+        ? "Discount"
+        : "Promo";
 
   return (
-    <View className={`${bgColor} self-start px-3 py-1 rounded-full`}>
-      <Text
-        className={`${textColor} text-[10px] font-black uppercase tracking-widest`}
-      >
-        {label}
-      </Text>
+    <View style={styles.badge}>
+      <Text style={[styles.text, typeface(font.medium, "500")]}>{label}</Text>
     </View>
   );
-};
+}
 
-export default TypeBadge;
+const styles = StyleSheet.create({
+  badge: {
+    alignSelf: "flex-start",
+    backgroundColor: "#E8EEF8",
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 999,
+  },
+  text: {
+    fontSize: 11,
+    color: "#2563EB",
+  },
+});
