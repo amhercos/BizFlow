@@ -2,7 +2,6 @@
 using Application.Interfaces.Repositories;
 using MediatR;
 
-
 namespace Application.Features.Products.Queries
 {
     public class GetProductByIdHandler(IProductRepository productRepository) : IRequestHandler<GetProductByIdQuery, ProductDto>
@@ -20,12 +19,15 @@ namespace Application.Features.Products.Queries
                 product.Name,
                 product.Description,
                 product.Price,
+                product.PackPrice,
+                product.PiecesPerPack,
                 product.Stock,
                 product.LowStockThreshold,
                 product.Category?.CategoryName ?? "No Category",
                 product.ExpiryDate,
-                product.CategoryId);
-
+                product.CategoryId,
+                null
+            );
         }
     }
 }

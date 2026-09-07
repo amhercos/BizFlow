@@ -1,19 +1,18 @@
 ﻿using Application.Dto;
 using MediatR;
-using System.Text.Json.Serialization;
 
-namespace Application.Features.Products.Commands;
-
-public class UpdateProductCommand : IRequest<ProductDto>
+namespace Application.Features.Products.Commands
 {
-    [JsonIgnore]
-    public Guid Id { get; set; }
-
-    public required string Name { get; set; } = null!;
-    public string? Description { get; set; }
-    public decimal Price { get; set; }
-    public int Stock { get; set; }
-    public int LowStockThreshold { get; set; }
-    public DateOnly? ExpiryDate { get; set; }
-    public Guid CategoryId { get; set; }
+    public record UpdateProductCommand(
+        Guid Id,
+        string Name,
+        decimal Price,
+        decimal? PackPrice,
+        int? PiecesPerPack,
+        int Stock,
+        int LowStockThreshold,
+        Guid? CategoryId,
+        string? Description,
+        DateOnly? ExpiryDate
+    ) : IRequest<ProductDto>;
 }

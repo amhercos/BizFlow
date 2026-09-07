@@ -2,6 +2,7 @@ import { apiClient } from "@/src/api/client";
 import { roundTo } from "@/src/lib/math";
 import {
   PaymentType,
+  UnitType,
   type ApiError,
   type BasketItem,
   type CheckoutParams,
@@ -51,48 +52,89 @@ export function useSale() {
     };
   }, [basket]);
 
-  const addToBasket = useCallback((product: Product): void => {
-    setBasket((prev) => {
-      const existingItem = prev.find((item) => item.productId === product.id);
+  const addToBasket = useCallback(
+    (product: Product, unitType: UnitType = UnitType.Piece): void => {
+      setBasket((prev) => {
+        const existingIndex = prev.findIndex(
+          (item) => item.productId === product.id && item.unitType === unitType,
+        );
 
-      if (existingItem) {
-        if (existingItem.quantity >= product.stock) {
-          Alert.alert("Stock Limit", `Only ${product.stock} units available.`);
+        const isPack = unitType === UnitType.Pack;
+        const selectedUnitPrice = isPack ? product.packPrice : product.price;
+        const multiplier =
+          isPack && product.piecesPerPack > 0 ? product.piecesPerPack : 1;
+        const requiredStock = 1 * multiplier;
+
+        if (existingIndex > -1) {
+          const existingItem = prev[existingIndex];
+          const nextQty = existingItem.quantity + 1;
+          const totalRequiredStock = nextQty * multiplier;
+
+          if (totalRequiredStock > product.stock) {
+            Alert.alert(
+              "Stock Limit",
+              `Only ${product.stock} base units available.`,
+            );
+            return prev;
+          }
+
+          const updated = [...prev];
+          updated[existingIndex] = {
+            ...existingItem,
+            quantity: nextQty,
+            unitPrice: selectedUnitPrice,
+          };
+          return updated;
+        }
+
+        if (requiredStock > product.stock) {
+          Alert.alert("Stock Limit", `Not enough stock for a full pack.`);
           return prev;
         }
 
-        return prev.map((item) =>
-          item.productId === product.id
-            ? { ...item, quantity: item.quantity + 1 }
-            : item,
-        );
-      }
+        return [
+          ...prev,
+          {
+            productId: product.id,
+            name: `${product.name} (${unitType})`,
+            quantity: 1,
+            unitPrice: selectedUnitPrice,
+            stock: product.stock,
+            unitType: unitType,
+            piecesPerPack: product.piecesPerPack || 1,
+            packPrice: product.packPrice || 0,
+            retailPrice: product.price,
+            promotions: product.promotions,
+          },
+        ];
+      });
+    },
+    [],
+  );
 
-      return [
-        ...prev,
-        {
-          productId: product.id,
-          name: product.name,
-          quantity: 1,
-          unitPrice: product.price,
-          stock: product.stock,
-          promotions: product.promotions,
-        },
-      ];
-    });
-  }, []);
-
-  const removeItem = useCallback((productId: string): void => {
-    setBasket((prev) => prev.filter((item) => item.productId !== productId));
-  }, []);
+  const removeItem = useCallback(
+    (productId: string, unitType: UnitType): void => {
+      setBasket((prev) =>
+        prev.filter(
+          (item) =>
+            !(item.productId === productId && item.unitType === unitType),
+        ),
+      );
+    },
+    [],
+  );
 
   const updateQuantity = useCallback(
-    (productId: string, nextQty: number): void => {
+    (productId: string, unitType: UnitType, nextQty: number): void => {
       setBasket((prev) =>
         prev.map((item) => {
-          if (item.productId !== productId) return item;
-          if (nextQty > item.stock) {
-            Alert.alert("Stock Limit", `Cannot exceed ${item.stock} units.`);
+          if (item.productId !== productId || item.unitType !== unitType)
+            return item;
+
+          const multiplier =
+            item.unitType === UnitType.Pack ? item.piecesPerPack : 1;
+          if (nextQty * multiplier > item.stock) {
+            Alert.alert("Stock Limit", `Cannot exceed available stock limit.`);
             return item;
           }
           if (nextQty <= 0) return item;
@@ -108,7 +150,6 @@ export function useSale() {
   const checkout = async (params: CheckoutParams): Promise<boolean> => {
     if (basket.length === 0) return false;
 
-    // No promotions applied if payment type is Credit
     const isCredit = params.paymentType === PaymentType.Credit;
     const capturedTotal = isCredit ? totals.creditTotal : totals.cashTotal;
     const capturedCash = params.cashReceived ?? 0;
@@ -126,11 +167,16 @@ export function useSale() {
     try {
       const command: CreateTransactionCommand = {
         items: basket.map((item) => {
+          const isPack = item.unitType === UnitType.Pack;
+
           if (isCredit) {
+            const subTotal = roundTo(item.unitPrice * item.quantity, 2);
             return {
               productId: item.productId,
               quantity: item.quantity,
+              isPack,
               unitPrice: item.unitPrice,
+              subTotal,
             };
           }
 
@@ -138,7 +184,9 @@ export function useSale() {
           return {
             productId: item.productId,
             quantity: item.quantity,
+            isPack,
             unitPrice: roundTo(discountedTotal / item.quantity, 2),
+            subTotal: roundTo(discountedTotal, 2),
           };
         }),
         paymentType: params.paymentType,
@@ -179,7 +227,6 @@ export function useSale() {
   };
 }
 
-// Global utility formatting helpers
 function formatPHP(amount: number): string {
   return `₱${amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}`;
 }

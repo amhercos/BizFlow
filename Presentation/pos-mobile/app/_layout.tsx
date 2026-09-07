@@ -1,6 +1,6 @@
 import { DrawerContentComponentProps } from "@react-navigation/drawer";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { Slot, useRouter, useSegments } from "expo-router";
+import { useRouter, useSegments } from "expo-router";
 import { Drawer } from "expo-router/drawer";
 import { BarChart3, LogOut, Settings, Store } from "lucide-react-native";
 import React, { memo, useCallback, useEffect } from "react";
@@ -14,8 +14,12 @@ import {
   useWindowDimensions,
 } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import {
+  SafeAreaProvider,
+  useSafeAreaInsets,
+} from "react-native-safe-area-context";
 import Toast from "react-native-toast-message";
+
 import "../global.css";
 import { AuthProvider, useAuth } from "../src/context/AuthContext";
 import { NavigationBridge, setDrawerNavigation } from "../src/utils/drawerRef";
@@ -162,39 +166,44 @@ function RootLayoutNav(): React.JSX.Element {
 
   return (
     <GestureHandlerRootView style={styles.flexOne}>
-      {!token ? (
-        <Slot />
-      ) : (
-        <Drawer
-          drawerContent={(props: DrawerContentComponentProps) => (
-            <CustomDrawerContent {...props} />
-          )}
-          screenOptions={{
-            headerShown: false,
-            drawerType: "front",
-            drawerStyle: { width: isLargeScreen ? 300 : "80%" },
-            overlayColor: "rgba(0, 0, 0, 0.4)",
-            sceneStyle: { backgroundColor: "#ffffff" },
+      <Drawer
+        drawerContent={(props: DrawerContentComponentProps) => (
+          <CustomDrawerContent {...props} />
+        )}
+        screenOptions={{
+          headerShown: false,
+          drawerType: "front",
+          drawerStyle: { width: isLargeScreen ? 300 : "80%" },
+          overlayColor: "rgba(0, 0, 0, 0.4)",
+          sceneStyle: { backgroundColor: "#ffffff" },
+        }}
+      >
+        <Drawer.Screen
+          name="index"
+          options={{
+            drawerItemStyle: { display: "none" },
+            swipeEnabled: false,
           }}
-        >
-          <Drawer.Screen
-            name="(tabs)"
-            options={{ drawerLabel: "Home", title: "Dashboard" }}
-          />
-        </Drawer>
-      )}
+        />
+        <Drawer.Screen
+          name="(tabs)"
+          options={{ drawerLabel: "Home", title: "Dashboard" }}
+        />
+      </Drawer>
     </GestureHandlerRootView>
   );
 }
 
 export default function RootLayout(): React.JSX.Element {
   return (
-    <QueryClientProvider client={queryClient}>
-      <AuthProvider>
-        <RootLayoutNav />
-        <Toast />
-      </AuthProvider>
-    </QueryClientProvider>
+    <SafeAreaProvider>
+      <QueryClientProvider client={queryClient}>
+        <AuthProvider>
+          <RootLayoutNav />
+          <Toast />
+        </AuthProvider>
+      </QueryClientProvider>
+    </SafeAreaProvider>
   );
 }
 

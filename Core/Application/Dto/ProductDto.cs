@@ -7,6 +7,8 @@ namespace Application.Dto
         string Name,
         string? Description,
         decimal Price,
+        decimal? PackPrice,
+        int? PiecesPerPack,
         int StockQuantity,
         int LowStockThreshold,
         string CategoryName,
@@ -24,7 +26,7 @@ namespace Application.Dto
       Guid? TieUpProductId = null,
       string? TieUpProductName = null,
       int? TieUpQuantity = null
-  );
+    );
 
     public record PromoTierDto(
         int Quantity,

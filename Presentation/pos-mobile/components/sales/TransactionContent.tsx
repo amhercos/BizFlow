@@ -1,5 +1,5 @@
 import { type CustomerCredit } from "@/src/types/credit";
-import { PaymentType, type BasketItem } from "@/src/types/sale";
+import { PaymentType, UnitType, type BasketItem } from "@/src/types/sale";
 import { CheckCircle2, RotateCcw, X } from "lucide-react-native";
 import React, { memo, useMemo } from "react";
 import {
@@ -30,8 +30,12 @@ interface TransactionContentProps {
   handleCheckout: () => void;
   clearBasket: () => void;
   onClose: () => void;
-  updateQuantity: (id: string, q: number) => void;
-  removeItem: (id: string) => void;
+  updateQuantity: (
+    productId: string,
+    unitType: UnitType,
+    nextQty: number,
+  ) => void;
+  removeItem: (productId: string, unitType: UnitType) => void;
   credits: CustomerCredit[];
   selectedCreditId: string;
   setSelectedCreditId: (s: string) => void;

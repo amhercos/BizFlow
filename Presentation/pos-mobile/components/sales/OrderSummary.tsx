@@ -1,6 +1,6 @@
 import { formatPHP } from "@/src/lib/math";
 import { cn } from "@/src/lib/utils";
-import { type BasketItem } from "@/src/types/sale";
+import { UnitType, type BasketItem } from "@/src/types/sale";
 import { calculateLineTotal } from "@/src/utils/promotion-engine";
 import { Minus, Plus, ShoppingBag, Trash2 } from "lucide-react-native";
 import React from "react";
@@ -8,8 +8,12 @@ import { ScrollView, Text, TouchableOpacity, View } from "react-native";
 
 interface OrderSummaryProps {
   basket: BasketItem[];
-  updateQuantity: (id: string, q: number) => void;
-  removeItem: (id: string) => void;
+  updateQuantity: (
+    productId: string,
+    unitType: UnitType,
+    nextQty: number,
+  ) => void;
+  removeItem: (productId: string, unitType: UnitType) => void;
 }
 
 export const OrderSummary: React.FC<OrderSummaryProps> = ({
@@ -31,10 +35,11 @@ export const OrderSummary: React.FC<OrderSummaryProps> = ({
       {basket.map((item) => {
         const promoCalc = calculateLineTotal(item, basket);
         const hasActivePromo = promoCalc.savings > 0;
+        const itemUnitType = item.unitType ?? UnitType.Piece;
 
         return (
           <View
-            key={item.productId}
+            key={`${item.productId}-${itemUnitType}`}
             className="flex-row items-center bg-white border border-slate-100 p-3.5 rounded-2xl mb-2.5 shadow-sm"
           >
             {/* Item Info Description Area */}
@@ -71,9 +76,13 @@ export const OrderSummary: React.FC<OrderSummaryProps> = ({
               <TouchableOpacity
                 onPress={() => {
                   if (item.quantity === 1) {
-                    removeItem(item.productId); // Drop item entirely from basket array if min units reached
+                    removeItem(item.productId, itemUnitType);
                   } else {
-                    updateQuantity(item.productId, item.quantity - 1);
+                    updateQuantity(
+                      item.productId,
+                      itemUnitType,
+                      item.quantity - 1,
+                    );
                   }
                 }}
                 className="w-7 h-7 items-center justify-center rounded-lg bg-white shadow-sm"
@@ -93,7 +102,11 @@ export const OrderSummary: React.FC<OrderSummaryProps> = ({
 
               <TouchableOpacity
                 onPress={() =>
-                  updateQuantity(item.productId, item.quantity + 1)
+                  updateQuantity(
+                    item.productId,
+                    itemUnitType,
+                    item.quantity + 1,
+                  )
                 }
                 className="w-7 h-7 items-center justify-center rounded-lg bg-white shadow-sm"
               >
@@ -120,7 +133,7 @@ export const OrderSummary: React.FC<OrderSummaryProps> = ({
 
             {/* Direct Multi-item Row Deletion Accessor */}
             <TouchableOpacity
-              onPress={() => removeItem(item.productId)}
+              onPress={() => removeItem(item.productId, itemUnitType)}
               className="ml-2.5 p-1 bg-slate-50 rounded-lg border border-slate-100"
             >
               <Trash2 size={12} color="#94a3b8" />

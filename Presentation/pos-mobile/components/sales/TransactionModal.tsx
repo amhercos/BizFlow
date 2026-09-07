@@ -1,5 +1,5 @@
 import { type CustomerCredit } from "@/src/types/credit";
-import { PaymentType, type BasketItem } from "@/src/types/sale";
+import { PaymentType, UnitType, type BasketItem } from "@/src/types/sale";
 import React, { Dispatch, SetStateAction } from "react";
 import {
   Modal,
@@ -20,8 +20,12 @@ interface TransactionModalProps {
   setCashReceived: Dispatch<SetStateAction<number>>;
   isSubmitting: boolean;
   handleCheckout: () => void;
-  updateQuantity: (id: string, q: number) => void;
-  removeItem: (id: string) => void;
+  updateQuantity: (
+    productId: string,
+    unitType: UnitType,
+    nextQty: number,
+  ) => void;
+  removeItem: (productId: string, unitType: UnitType) => void;
   clearBasket: () => void;
   credits: CustomerCredit[];
   selectedCreditId: string;
