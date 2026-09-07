@@ -1,14 +1,30 @@
-import { CalendarDays, Filter, RefreshCcw, Search } from "lucide-react-native";
+import { WeekBarChart } from "@/components/dashboard/WeekBarChart";
+import { DrawerMenuButton } from "@/components/navigation/DrawerMenuButton";
+import { ReceiptModal } from "@/components/reports/ReceiptModal";
+import { TenderMixBar } from "@/components/reports/TenderMixBar";
+import { TransactionTable } from "@/components/reports/TransactionTable";
+import { useReport } from "@/src/hooks/use-report";
+import {
+  buildReportSeries,
+  peakPoint,
+  tenderMix,
+} from "@/src/lib/report-analytics";
+import type { ReportPeriod } from "@/src/services/reportService";
+import { typeface, useInter } from "@/src/theme/typography";
+import type { TransactionDetails } from "@/src/types/record";
+import * as Haptics from "expo-haptics";
+import { RefreshCcw, Search } from "lucide-react-native";
 import { Skeleton } from "moti/skeleton";
 import React, {
-  memo,
   ReactElement,
   useCallback,
+  useEffect,
   useMemo,
   useState,
 } from "react";
 import {
-  DimensionValue,
+  Pressable,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -16,128 +32,73 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { ReceiptModal } from "@/components/reports/ReceiptModal";
-import { TransactionTable } from "@/components/reports/TransactionTable";
-import { useReport } from "@/src/hooks/use-report";
-import { useTransactionHistory } from "@/src/hooks/use-transaction-history";
-import type { ReportPeriod } from "@/src/services/reportService";
-import type { TransactionDetails } from "@/src/types/record";
+const INK = "#0F172A";
+const MUTED = "#64748B";
+const TINT = "#2563EB";
 
-interface AnalyticsCardProps {
-  label: string;
-  value: string;
-  accent: string;
-  width: DimensionValue;
-  loading?: boolean; // Added prop
+const PERIODS: { id: ReportPeriod; label: string }[] = [
+  { id: "today", label: "Today" },
+  { id: "weekly", label: "Week" },
+  { id: "monthly", label: "Month" },
+];
+
+type MethodFilter = "All" | "Cash" | "Credit";
+type ChartMetric = "sales" | "orders";
+
+function formatPHP(val: number) {
+  return `₱${val.toLocaleString("en-PH", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`;
 }
 
-const AnalyticsCard = memo(
-  ({
-    label,
-    value,
-    accent,
-    width,
-    loading,
-  }: AnalyticsCardProps): ReactElement => (
-    <View
-      style={{ width }}
-      className="bg-white border border-slate-100 p-5 rounded-[28px] shadow-sm"
-    >
-      {/* Skeleton.Group synchronizes the shimmer wave */}
-      <Skeleton.Group show={!!loading}>
-        <View className={`w-8 h-1.5 rounded-full mb-4 ${accent}`} />
-        <Text className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1">
-          {label}
-        </Text>
-        <Skeleton colorMode="light" width="85%" height={24} radius={8}>
-          <Text className="text-lg font-black text-slate-950" numberOfLines={1}>
-            {value}
-          </Text>
-        </Skeleton>
-      </Skeleton.Group>
-    </View>
-  ),
-);
-AnalyticsCard.displayName = "AnalyticsCard";
+function periodKicker(period: ReportPeriod) {
+  if (period === "weekly") return "This week's sales";
+  if (period === "monthly") return "This month's sales";
+  return "Today's sales";
+}
 
-const Pagination = memo(
-  ({
-    page,
-    setPage,
-    hasMore,
-  }: {
-    page: number;
-    setPage: (p: number) => void;
-    hasMore: boolean;
-  }): ReactElement => (
-    <View className="flex-row items-center justify-between mt-6">
-      <TouchableOpacity
-        onPress={() => setPage(page - 1)}
-        disabled={page === 1}
-        className={`px-4 py-2 rounded-xl ${page === 1 ? "opacity-20" : "bg-slate-100"}`}
-      >
-        <Text className="text-[10px] font-black uppercase text-slate-900">
-          Prev
-        </Text>
-      </TouchableOpacity>
+function compactPHP(amount: number) {
+  if (amount >= 10000) return `₱${Math.round(amount / 1000)}k`;
+  if (amount >= 1000) return `₱${(amount / 1000).toFixed(1)}k`;
+  return `₱${Math.round(amount)}`;
+}
 
-      <View className="flex-row items-center">
-        <CalendarDays size={12} color="#94a3b8" />
-        <Text className="ml-2 text-[10px] font-black text-slate-400 uppercase">
-          Page {page}
-        </Text>
-      </View>
-
-      <TouchableOpacity
-        onPress={() => setPage(page + 1)}
-        disabled={!hasMore}
-        className={`px-4 py-2 rounded-xl ${!hasMore ? "opacity-20" : "bg-slate-100"}`}
-      >
-        <Text className="text-[10px] font-black uppercase text-slate-900">
-          Next
-        </Text>
-      </TouchableOpacity>
-    </View>
-  ),
-);
-Pagination.displayName = "Pagination";
+function chartCaption(period: ReportPeriod) {
+  if (period === "today") return "By hour";
+  if (period === "monthly") return "By week";
+  return "By day";
+}
 
 export default function RecordsScreen(): ReactElement {
+  const insets = useSafeAreaInsets();
+  const font = useInter();
   const {
     summary,
     recentTransactions,
-    loading: summaryLoading,
+    chartTransactions,
+    topProduct,
+    loading,
+    analyticsLoading,
+    listLoading,
     period,
     setPeriod,
-    refresh: refreshSummary,
-  } = useReport("today");
-
-  const {
-    loading: historyLoading,
     page,
     setPage,
     pageSize,
+    refresh,
     getTransactionById,
-    topProduct,
-  } = useTransactionHistory();
-
-  const loading = summaryLoading || historyLoading;
+  } = useReport("today");
 
   const [searchQuery, setSearchQuery] = useState("");
-  const [methodFilter, setMethodFilter] = useState<"All" | "Cash" | "Credit">(
-    "All",
-  );
+  const [methodFilter, setMethodFilter] = useState<MethodFilter>("All");
+  const [chartMetric, setChartMetric] = useState<ChartMetric>("sales");
+  const [selectedBar, setSelectedBar] = useState(0);
   const [selectedTx, setSelectedTx] = useState<TransactionDetails | null>(null);
   const [isReceiptOpen, setIsReceiptOpen] = useState(false);
   const [isFetchingDetails, setIsFetchingDetails] = useState(false);
-
-  const formatPHP = useCallback(
-    (val: number) =>
-      `₱${val.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
-    [],
-  );
 
   const handleOpenReceipt = useCallback(
     async (id: string) => {
@@ -160,139 +121,332 @@ export default function RecordsScreen(): ReactElement {
   );
 
   const filteredTransactions = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
     return recentTransactions.filter((tx) => {
-      const matchesSearch = tx.id
-        .toLowerCase()
-        .includes(searchQuery.toLowerCase());
+      const matchesSearch =
+        query.length === 0 || tx.id.toLowerCase().includes(query);
       const matchesMethod =
         methodFilter === "All" || tx.paymentType === methodFilter;
       return matchesSearch && matchesMethod;
     });
   }, [recentTransactions, searchQuery, methodFilter]);
 
-  return (
-    <SafeAreaView className="flex-1 bg-white" edges={["top"]}>
-      <View key={`screen-${period}`} style={styles.contentWrapper}>
-        <ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
-          {/* Header */}
-          <View className="px-6 pt-6 flex-row items-center justify-between">
-            <View>
-              <Text className="text-3xl font-black text-slate-950 tracking-tighter">
-                Analytics
-              </Text>
-              <Text className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                Business Performance
-              </Text>
-            </View>
-            <TouchableOpacity
-              onPress={() => refreshSummary()}
-              disabled={loading}
-              className="bg-slate-100 p-3 rounded-2xl"
-            >
-              <RefreshCcw size={18} color={loading ? "#cbd5e1" : "#0f172a"} />
-            </TouchableOpacity>
-          </View>
+  const avgTicket = useMemo(() => {
+    const orders = summary?.totalTransactions ?? 0;
+    if (!orders) return 0;
+    return (summary?.totalRevenue ?? 0) / orders;
+  }, [summary]);
 
-          {/* Period Switcher */}
-          <View className="px-6 py-6">
-            <View className="flex-row bg-slate-100 p-1 rounded-2xl">
-              {(["today", "weekly", "monthly"] as ReportPeriod[]).map((p) => (
-                <TouchableOpacity
-                  key={p}
-                  onPress={() => setPeriod(p)}
-                  className={`flex-1 py-2.5 rounded-xl items-center ${period === p ? "bg-white shadow-sm" : ""}`}
+  const series = useMemo(
+    () => buildReportSeries(period, chartTransactions),
+    [period, chartTransactions],
+  );
+  const mix = useMemo(
+    () => tenderMix(chartTransactions),
+    [chartTransactions],
+  );
+  const peak = useMemo(
+    () => peakPoint(series, chartMetric),
+    [series, chartMetric],
+  );
+  const chartValues = series.map((point) =>
+    chartMetric === "sales" ? point.sales : point.orders,
+  );
+
+  useEffect(() => {
+    setSelectedBar(Math.max(0, series.length - 1));
+  }, [period, series.length]);
+
+  const onPeriod = useCallback(
+    (next: ReportPeriod) => {
+      if (next === period) return;
+      setPeriod(next);
+      void Haptics.selectionAsync();
+    },
+    [period, setPeriod],
+  );
+
+  return (
+    <View style={styles.screen}>
+      <ScrollView
+        style={styles.screen}
+        contentContainerStyle={{
+          paddingTop: insets.top + 10,
+          paddingHorizontal: 22,
+          paddingBottom: 110,
+        }}
+        keyboardShouldPersistTaps="handled"
+        refreshControl={
+          <RefreshControl
+            refreshing={loading}
+            onRefresh={refresh}
+            tintColor={TINT}
+          />
+        }
+      >
+        <View style={styles.header}>
+          <DrawerMenuButton />
+          <View style={styles.identity}>
+            <Text style={[styles.title, typeface(font.bold, "700")]}>
+              Reports
+            </Text>
+            <Text style={[styles.subtitle, typeface(font.medium, "500")]}>
+              Sales performance
+            </Text>
+          </View>
+          <TouchableOpacity
+            onPress={refresh}
+            disabled={loading}
+            style={styles.iconBtn}
+            accessibilityLabel="Refresh reports"
+          >
+            <RefreshCcw
+              size={18}
+              color={loading ? "#CBD5E1" : INK}
+              strokeWidth={1.8}
+            />
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.segment}>
+          {PERIODS.map((item) => {
+            const active = period === item.id;
+            return (
+              <Pressable
+                key={item.id}
+                onPress={() => onPeriod(item.id)}
+                style={[styles.segmentItem, active && styles.segmentItemOn]}
+              >
+                <Text
+                  style={[
+                    styles.segmentText,
+                    active && styles.segmentTextOn,
+                    typeface(active ? font.semibold : font.medium, "600"),
+                  ]}
+                >
+                  {item.label}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+
+        {loading && !summary ? (
+          <View style={{ marginTop: 8 }}>
+            <Skeleton colorMode="light" width={140} height={14} radius={6} />
+            <View style={{ height: 12 }} />
+            <Skeleton colorMode="light" width={240} height={38} radius={8} />
+          </View>
+        ) : (
+          <>
+            <Text style={[styles.kicker, typeface(font.medium, "500")]}>
+              {periodKicker(period)}
+            </Text>
+            <Text
+              style={[styles.hero, typeface(font.bold, "700")]}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+            >
+              {formatPHP(summary?.totalRevenue ?? 0)}
+            </Text>
+          </>
+        )}
+
+        <View style={styles.chartHead}>
+          <Text style={[styles.listTitle, typeface(font.bold, "700")]}>
+            {chartCaption(period)}
+          </Text>
+          <View style={styles.metricToggle}>
+            {(["sales", "orders"] as ChartMetric[]).map((item) => {
+              const active = chartMetric === item;
+              return (
+                <Pressable
+                  key={item}
+                  onPress={() => {
+                    setChartMetric(item);
+                    void Haptics.selectionAsync();
+                  }}
+                  style={[styles.metricChip, active && styles.metricChipOn]}
                 >
                   <Text
-                    className={`text-[10px] font-black uppercase ${period === p ? "text-slate-900" : "text-slate-400"}`}
+                    style={[
+                      styles.metricChipText,
+                      active && styles.metricChipTextOn,
+                      typeface(font.medium, "500"),
+                    ]}
                   >
-                    {p}
+                    {item === "sales" ? "Sales" : "Orders"}
                   </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
+                </Pressable>
+              );
+            })}
           </View>
+        </View>
 
-          {/* Stats Grid - Skeleton Added */}
-          <View className="px-6 mb-8">
-            <View className="flex-row justify-between mb-4">
-              <AnalyticsCard
-                loading={summaryLoading}
-                label={`${period} Revenue`}
-                value={formatPHP(summary?.totalRevenue || 0)}
-                accent="bg-emerald-500"
-                width="48%"
-              />
-              <AnalyticsCard
-                loading={summaryLoading}
-                label="Volume"
-                value={(summary?.totalTransactions ?? 0).toString()}
-                accent="bg-blue-500"
-                width="48%"
-              />
-            </View>
-            <AnalyticsCard
-              loading={historyLoading}
-              label="Most Popular Item"
-              value={topProduct?.name || "No Data"}
-              accent="bg-amber-500"
-              width="100%"
-            />
+        {analyticsLoading && chartTransactions.length === 0 ? (
+          <View style={{ marginTop: 12 }}>
+            <Skeleton colorMode="light" width="100%" height={168} radius={16} />
           </View>
+        ) : (
+          <WeekBarChart
+            values={chartValues}
+            labels={series.map((point) => point.label)}
+            selected={Math.min(selectedBar, Math.max(series.length - 1, 0))}
+            onSelect={(index) => {
+              setSelectedBar(index);
+              void Haptics.selectionAsync();
+            }}
+            formatValue={
+              chartMetric === "sales" ? compactPHP : (value) => String(value)
+            }
+            fontFamily={font.semibold}
+          />
+        )}
 
-          {/* Search & Filter */}
-          <View className="px-6 mb-4">
-            <View className="flex-row gap-2">
-              <View className="flex-1 flex-row items-center bg-slate-50 rounded-2xl px-4 h-12">
-                <Search size={18} color="#94a3b8" />
-                <TextInput
-                  placeholder="Search Reference..."
-                  value={searchQuery}
-                  onChangeText={setSearchQuery}
-                  className="flex-1 ml-2 text-sm font-bold text-slate-700"
-                />
-              </View>
-              <TouchableOpacity
-                onPress={() =>
-                  setMethodFilter((prev) =>
-                    prev === "All"
-                      ? "Cash"
-                      : prev === "Cash"
-                        ? "Credit"
-                        : "All",
-                  )
-                }
-                className="bg-slate-900 rounded-2xl px-4 flex-row items-center"
-              >
-                <Filter size={16} color="white" />
-                <Text className="ml-2 text-[10px] font-black text-white uppercase">
-                  {methodFilter}
-                </Text>
-              </TouchableOpacity>
-            </View>
-          </View>
+        {peak && (chartMetric === "sales" ? peak.sales : peak.orders) > 0 ? (
+          <Text style={[styles.insight, typeface(font.medium, "500")]}>
+            Busiest {peak.label}
+            {" · "}
+            {chartMetric === "sales"
+              ? compactPHP(peak.sales)
+              : `${peak.orders} orders`}
+          </Text>
+        ) : null}
 
-          {/* Transactions Area - Skeleton handling is passed to TransactionTable */}
-          <View className="px-6 mb-24">
-            <Text className="text-lg font-black text-slate-900 mb-4">
-              {period.charAt(0).toUpperCase() + period.slice(1)} Transactions
+        <TenderMixBar mix={mix} font={font} />
+
+        <View style={styles.washes}>
+          <View style={[styles.wash, { backgroundColor: "#EAF8D8" }]}>
+            <Text style={[styles.washLabel, typeface(font.medium, "500")]}>
+              Orders
             </Text>
-            <TransactionTable
-              data={filteredTransactions}
-              loading={loading}
-              onViewDetails={handleOpenReceipt}
-            />
-
-            {/* Hide pagination during load to prevent accidental clicks */}
-            {!loading && (
-              <Pagination
-                page={page}
-                setPage={setPage}
-                hasMore={recentTransactions.length >= pageSize}
-              />
-            )}
+            <Text style={[styles.washValue, typeface(font.bold, "700")]}>
+              {loading && !summary
+                ? "—"
+                : String(summary?.totalTransactions ?? 0)}
+            </Text>
           </View>
-        </ScrollView>
-      </View>
+          <View style={[styles.wash, { backgroundColor: "#DCEBFF" }]}>
+            <Text style={[styles.washLabel, typeface(font.medium, "500")]}>
+              Avg ticket
+            </Text>
+            <Text style={[styles.washValue, typeface(font.bold, "700")]}>
+              {loading && !summary ? "—" : formatPHP(avgTicket)}
+            </Text>
+          </View>
+        </View>
+
+        {topProduct ? (
+          <View style={styles.topRow}>
+            <View>
+              <Text style={[styles.topLabel, typeface(font.medium, "500")]}>
+                Top product
+              </Text>
+              <Text
+                style={[styles.topName, typeface(font.semibold, "600")]}
+                numberOfLines={1}
+              >
+                {topProduct.name}
+              </Text>
+            </View>
+            <Text style={[styles.topMeta, typeface(font.medium, "500")]}>
+              {topProduct.quantitySold} sold
+            </Text>
+          </View>
+        ) : null}
+
+        <View style={styles.search}>
+          <Search size={16} color="#94A3B8" strokeWidth={2} />
+          <TextInput
+            placeholder="Search reference"
+            placeholderTextColor="#94A3B8"
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            autoCapitalize="none"
+            autoCorrect={false}
+            style={[styles.searchInput, typeface(font.medium, "500")]}
+          />
+        </View>
+
+        <View style={styles.filters}>
+          {(["All", "Cash", "Credit"] as MethodFilter[]).map((item) => {
+            const active = methodFilter === item;
+            return (
+              <Pressable
+                key={item}
+                onPress={() => setMethodFilter(item)}
+                style={[styles.filterChip, active && styles.filterChipOn]}
+              >
+                <Text
+                  style={[
+                    styles.filterText,
+                    active && styles.filterTextOn,
+                    typeface(font.medium, "500"),
+                  ]}
+                >
+                  {item}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+
+        <View style={styles.listHead}>
+          <Text style={[styles.listTitle, typeface(font.bold, "700")]}>
+            Transactions
+          </Text>
+          <View style={styles.chip}>
+            <Text style={[styles.chipText, typeface(font.medium, "500")]}>
+              {PERIODS.find((item) => item.id === period)?.label}
+            </Text>
+          </View>
+        </View>
+
+        <TransactionTable
+          data={filteredTransactions}
+          loading={listLoading}
+          onViewDetails={handleOpenReceipt}
+          font={font}
+        />
+
+        {!listLoading ? (
+          <View style={styles.pager}>
+            <Pressable
+              onPress={() => setPage(page - 1)}
+              disabled={page === 1}
+              style={styles.pagerBtn}
+            >
+              <Text
+                style={[
+                  styles.pagerText,
+                  page === 1 && styles.pagerDisabled,
+                  typeface(font.semibold, "600"),
+                ]}
+              >
+                Previous
+              </Text>
+            </Pressable>
+            <Text style={[styles.pagerPage, typeface(font.medium, "500")]}>
+              Page {page}
+            </Text>
+            <Pressable
+              onPress={() => setPage(page + 1)}
+              disabled={recentTransactions.length < pageSize}
+              style={styles.pagerBtn}
+            >
+              <Text
+                style={[
+                  styles.pagerText,
+                  recentTransactions.length < pageSize && styles.pagerDisabled,
+                  typeface(font.semibold, "600"),
+                ]}
+              >
+                Next
+              </Text>
+            </Pressable>
+          </View>
+        ) : null}
+      </ScrollView>
 
       <ReceiptModal
         data={selectedTx}
@@ -302,12 +456,233 @@ export default function RecordsScreen(): ReactElement {
           setSelectedTx(null);
         }}
       />
-    </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  contentWrapper: {
+  screen: {
     flex: 1,
+    backgroundColor: "#FAFBFD",
+  },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 20,
+  },
+  identity: {
+    flex: 1,
+    marginLeft: 12,
+    marginRight: 12,
+  },
+  title: {
+    fontSize: 20,
+    color: INK,
+    letterSpacing: -0.4,
+  },
+  subtitle: {
+    marginTop: 3,
+    fontSize: 13,
+    color: MUTED,
+  },
+  iconBtn: {
+    width: 40,
+    height: 40,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  segment: {
+    flexDirection: "row",
+    backgroundColor: "#EEF1F6",
+    borderRadius: 18,
+    padding: 4,
+    marginBottom: 22,
+  },
+  segmentItem: {
+    flex: 1,
+    height: 40,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  segmentItemOn: {
+    backgroundColor: TINT,
+  },
+  segmentText: {
+    fontSize: 14,
+    color: INK,
+  },
+  segmentTextOn: {
+    color: "#FFFFFF",
+  },
+  kicker: {
+    fontSize: 14,
+    color: MUTED,
+  },
+  hero: {
+    marginTop: 4,
+    fontSize: 36,
+    color: INK,
+    letterSpacing: -1.2,
+    fontVariant: ["tabular-nums"],
+  },
+  chartHead: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginTop: 28,
+    marginBottom: 4,
+  },
+  metricToggle: {
+    flexDirection: "row",
+    backgroundColor: "#EEF1F6",
+    borderRadius: 999,
+    padding: 3,
+  },
+  metricChip: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 999,
+  },
+  metricChipOn: {
+    backgroundColor: "#FFFFFF",
+  },
+  metricChipText: {
+    fontSize: 12,
+    color: MUTED,
+  },
+  metricChipTextOn: {
+    color: INK,
+  },
+  insight: {
+    marginTop: 6,
+    fontSize: 13,
+    color: MUTED,
+  },
+  washes: {
+    flexDirection: "row",
+    gap: 12,
+    marginTop: 28,
+  },
+  wash: {
+    flex: 1,
+    borderRadius: 22,
+    paddingHorizontal: 16,
+    paddingVertical: 18,
+  },
+  washLabel: {
+    fontSize: 13,
+    color: INK,
+    opacity: 0.65,
+  },
+  washValue: {
+    marginTop: 10,
+    fontSize: 20,
+    color: INK,
+    letterSpacing: -0.4,
+    fontVariant: ["tabular-nums"],
+  },
+  topRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginTop: 22,
+    paddingVertical: 4,
+  },
+  topLabel: {
+    fontSize: 13,
+    color: MUTED,
+  },
+  topName: {
+    marginTop: 4,
+    fontSize: 16,
+    color: INK,
+  },
+  topMeta: {
+    fontSize: 13,
+    color: MUTED,
+    fontVariant: ["tabular-nums"],
+  },
+  search: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#EEF1F6",
+    borderRadius: 16,
+    paddingHorizontal: 14,
+    height: 46,
+    marginTop: 24,
+  },
+  searchInput: {
+    flex: 1,
+    marginLeft: 8,
+    fontSize: 14,
+    color: INK,
+    paddingVertical: 0,
+  },
+  filters: {
+    flexDirection: "row",
+    gap: 8,
+    marginTop: 12,
+  },
+  filterChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 999,
+    backgroundColor: "#EEF1F6",
+  },
+  filterChipOn: {
+    backgroundColor: TINT,
+  },
+  filterText: {
+    fontSize: 13,
+    color: INK,
+  },
+  filterTextOn: {
+    color: "#FFFFFF",
+  },
+  listHead: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginTop: 28,
+    marginBottom: 4,
+  },
+  listTitle: {
+    fontSize: 13,
+    color: INK,
+    letterSpacing: 0.8,
+    textTransform: "uppercase",
+  },
+  chip: {
+    backgroundColor: "#E8EEF8",
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 999,
+  },
+  chipText: {
+    fontSize: 12,
+    color: TINT,
+  },
+  pager: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginTop: 8,
+    paddingVertical: 12,
+  },
+  pagerBtn: {
+    paddingVertical: 8,
+    paddingHorizontal: 4,
+  },
+  pagerText: {
+    fontSize: 14,
+    color: TINT,
+  },
+  pagerDisabled: {
+    color: "#CBD5E1",
+  },
+  pagerPage: {
+    fontSize: 13,
+    color: MUTED,
   },
 });

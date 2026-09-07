@@ -1,37 +1,35 @@
+import { DrawerMenuButton } from "@/components/navigation/DrawerMenuButton";
+import { useInventory } from "@/src/hooks/use-inventory";
+import { typeface, useInter } from "@/src/theme/typography";
+import type { Category, Product } from "@/src/types/inventory";
+import * as Haptics from "expo-haptics";
 import {
-  Calendar,
-  Edit3,
   FolderPlus,
   LayoutGrid,
   List as ListIcon,
   Plus,
   Search,
-  Tag,
-  Trash2,
   X,
 } from "lucide-react-native";
 import { Skeleton } from "moti/skeleton";
 import React, {
   ReactElement,
   useCallback,
-  useEffect,
   useMemo,
   useState,
 } from "react";
 import {
+  Pressable,
   RefreshControl,
   ScrollView,
+  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   View,
   useWindowDimensions,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
-
-import { useInventory } from "@/src/hooks/use-inventory";
-import { cn } from "@/src/lib/utils";
-import type { Category, Product } from "@/src/types/inventory";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { ConfirmationModal } from "../../components/ConfirmationModal";
 import { InventoryTable } from "../../components/inventory-table";
@@ -39,7 +37,10 @@ import { AddProductModal } from "../../components/inventory/add-product-modal";
 import { CategoryManagerModal } from "../../components/inventory/category-manager-modal";
 import { EditProductModal } from "../../components/inventory/edit-product-modal";
 
-// Enums & Types
+const INK = "#0F172A";
+const MUTED = "#64748B";
+const TINT = "#2563EB";
+
 enum ViewMode {
   TABLE = "table",
   GRID = "grid",
@@ -53,17 +54,25 @@ type FilterType =
   | "non-perishable"
   | "no-category";
 
-interface FilterBarProps {
-  activeFilter: FilterType | string;
-  setActiveFilter: (filter: FilterType | string) => void;
-  categories: Category[];
-  categorySearch: string;
-  setCategorySearch: (text: string) => void;
-  loading?: boolean;
+const FILTERS: { id: FilterType; label: string }[] = [
+  { id: "all", label: "All" },
+  { id: "low-stock", label: "Low stock" },
+  { id: "out-of-stock", label: "Out" },
+  { id: "expired", label: "Expired" },
+  { id: "no-category", label: "Uncategorized" },
+  { id: "non-perishable", label: "No expiry" },
+];
+
+function stockColor(product: Product) {
+  if (product.stockQuantity === 0) return "#E11D48";
+  if (product.stockQuantity <= product.lowStockThreshold) return "#D97706";
+  return "#15803D";
 }
 
 export default function InventoryScreen(): ReactElement {
+  const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
+  const font = useInter();
   const {
     products = [],
     categories = [],
@@ -85,35 +94,23 @@ export default function InventoryScreen(): ReactElement {
     delete: false,
   });
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
-  const [search, setSearch] = useState<string>("");
-  const [categorySearch, setCategorySearch] = useState<string>("");
+  const [search, setSearch] = useState("");
+  const [categorySearch, setCategorySearch] = useState("");
   const [activeFilter, setActiveFilter] = useState<FilterType | string>("all");
-
-  const onRefresh = useCallback(() => {
-    refresh();
-  }, [refresh]);
-
-  useEffect(() => {
-    onRefresh();
-  }, [onRefresh]);
-
-  const toggleViewMode = useCallback(
-    () =>
-      setViewMode((prev) =>
-        prev === ViewMode.TABLE ? ViewMode.GRID : ViewMode.TABLE,
-      ),
-    [],
-  );
 
   const handleEditPress = useCallback((product: Product) => {
     setSelectedProduct(product);
     setModals((m) => ({ ...m, edit: true }));
   }, []);
 
-  // Simplified: Accepts the whole product from the Table/Card swipe action
   const handleDeletePress = useCallback((product: Product) => {
     setSelectedProduct(product);
     setModals((m) => ({ ...m, delete: true }));
+  }, []);
+
+  const setFilter = useCallback((filter: FilterType | string) => {
+    setActiveFilter(filter);
+    void Haptics.selectionAsync();
   }, []);
 
   const filteredCategories = useMemo(() => {
@@ -122,6 +119,21 @@ export default function InventoryScreen(): ReactElement {
       ? categories.filter((c) => c.name.toLowerCase().includes(query))
       : categories;
   }, [categories, categorySearch]);
+
+  const stats = useMemo(() => {
+    const today = new Date();
+    let low = 0;
+    let out = 0;
+    let expired = 0;
+    for (const product of products) {
+      if (product.stockQuantity === 0) out += 1;
+      else if (product.stockQuantity <= product.lowStockThreshold) low += 1;
+      if (product.expiryDate && new Date(product.expiryDate) < today) {
+        expired += 1;
+      }
+    }
+    return { low, out, expired };
+  }, [products]);
 
   const filteredProducts = useMemo(() => {
     const today = new Date();
@@ -152,143 +164,205 @@ export default function InventoryScreen(): ReactElement {
     });
   }, [products, search, activeFilter]);
 
-  const gridItemWidth = (width - 48) / 2;
+  const gridItemWidth = (width - 56) / 2;
 
   return (
-    <SafeAreaView className="flex-1 bg-white" edges={["top"]}>
-      {/* Header */}
-      <View className="px-5 py-4 flex-row items-center justify-between border-b border-slate-50">
-        <View>
-          <Text className="text-2xl font-black text-slate-900 tracking-tighter">
-            Inventory
-          </Text>
-          <View className="h-4 justify-center">
-            {loading && products.length === 0 ? (
-              <Skeleton colorMode="light" width={60} height={10} />
-            ) : (
-              <Text className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                {filteredProducts.length} Results
-              </Text>
-            )}
-          </View>
-        </View>
-        <View className="flex-row items-center gap-2">
-          <TouchableOpacity
-            onPress={toggleViewMode}
-            className="bg-slate-100 p-2.5 rounded-xl"
-          >
-            {viewMode === ViewMode.TABLE ? (
-              <LayoutGrid size={18} color="#64748b" />
-            ) : (
-              <ListIcon size={18} color="#64748b" />
-            )}
-          </TouchableOpacity>
-          <TouchableOpacity
-            onPress={() => setModals((m) => ({ ...m, add: true }))}
-            className="bg-slate-900 flex-row items-center px-4 h-11 rounded-xl shadow-sm"
-          >
-            <Plus size={16} color="white" />
-            <Text className="text-white text-xs font-bold ml-2">Product</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-
+    <View style={styles.screen}>
       <ScrollView
-        className="flex-1"
+        style={styles.screen}
+        contentContainerStyle={{
+          paddingTop: insets.top + 10,
+          paddingHorizontal: 22,
+          paddingBottom: 110,
+        }}
+        keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
             refreshing={loading}
-            onRefresh={onRefresh}
-            tintColor="#0f172a"
+            onRefresh={refresh}
+            tintColor={TINT}
           />
         }
       >
-        <View className="px-5 py-4 bg-slate-50/30">
-          <View className="flex-row items-center gap-2 mb-4">
-            <View className="relative flex-1 justify-center">
-              <View className="absolute left-3.5 z-10">
-                <Search size={14} color="#94a3b8" />
-              </View>
-              <TextInput
-                placeholder="Search inventory..."
-                value={search}
-                onChangeText={setSearch}
-                className="bg-white border border-slate-200 h-11 pl-10 pr-4 rounded-2xl text-[13px] font-bold text-slate-900"
-              />
-            </View>
-            <TouchableOpacity
-              onPress={() => setModals((m) => ({ ...m, cat: true }))}
-              className="bg-white border border-slate-200 h-11 w-11 items-center justify-center rounded-2xl shadow-sm"
-            >
-              <FolderPlus size={18} color="#64748b" />
-            </TouchableOpacity>
+        <View style={styles.header}>
+          <DrawerMenuButton />
+          <View style={styles.identity}>
+            <Text style={[styles.title, typeface(font.bold, "700")]}>
+              Inventory
+            </Text>
+            <Text style={[styles.subtitle, typeface(font.medium, "500")]}>
+              {loading && products.length === 0
+                ? "Loading stock"
+                : `${filteredProducts.length} item${filteredProducts.length === 1 ? "" : "s"}`}
+            </Text>
           </View>
+          <TouchableOpacity
+            onPress={() => setModals((m) => ({ ...m, cat: true }))}
+            style={styles.iconBtn}
+            accessibilityLabel="Manage categories"
+          >
+            <FolderPlus size={18} color={INK} strokeWidth={1.8} />
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => setModals((m) => ({ ...m, add: true }))}
+            style={styles.addBtn}
+            accessibilityLabel="Add product"
+          >
+            <Plus size={18} color="#FFFFFF" strokeWidth={2.2} />
+          </TouchableOpacity>
+        </View>
 
-          <FilterBar
-            activeFilter={activeFilter}
-            setActiveFilter={setActiveFilter}
-            categories={filteredCategories}
-            categorySearch={categorySearch}
-            setCategorySearch={setCategorySearch}
-            loading={loading && categories.length === 0}
+        <View style={styles.stats}>
+          {(
+            [
+              {
+                id: "low-stock" as const,
+                label: "Low",
+                value: stats.low,
+                color: "#D97706",
+              },
+              {
+                id: "out-of-stock" as const,
+                label: "Out",
+                value: stats.out,
+                color: "#E11D48",
+              },
+              {
+                id: "expired" as const,
+                label: "Expired",
+                value: stats.expired,
+                color: "#15803D",
+              },
+            ] as const
+          ).map((item, index) => {
+            const active = activeFilter === item.id;
+            const display =
+              loading && products.length === 0 ? "—" : String(item.value);
+            return (
+              <View key={item.id} style={styles.statWrap}>
+                {index > 0 ? <View style={styles.statRule} /> : null}
+                <Pressable onPress={() => setFilter(item.id)} style={styles.stat}>
+                  <Text
+                    style={[
+                      styles.statValue,
+                      { color: item.color },
+                      typeface(font.bold, "700"),
+                    ]}
+                  >
+                    {display}
+                  </Text>
+                  <Text
+                    style={[
+                      styles.statLabel,
+                      active && styles.statLabelOn,
+                      typeface(font.medium, "500"),
+                    ]}
+                  >
+                    {item.label}
+                  </Text>
+                </Pressable>
+              </View>
+            );
+          })}
+        </View>
+
+        <View style={styles.search}>
+          <Search size={16} color="#94A3B8" strokeWidth={2} />
+          <TextInput
+            placeholder="Search products"
+            placeholderTextColor="#94A3B8"
+            value={search}
+            onChangeText={setSearch}
+            autoCapitalize="none"
+            autoCorrect={false}
+            style={[styles.searchInput, typeface(font.medium, "500")]}
           />
+          {search.length > 0 ? (
+            <Pressable onPress={() => setSearch("")} hitSlop={8}>
+              <X size={14} color="#94A3B8" />
+            </Pressable>
+          ) : null}
         </View>
 
-        <View className="px-5 pt-2 pb-20">
-          {loading && products.length === 0 ? (
-            <Skeleton.Group show={true}>
-              {viewMode === ViewMode.TABLE ? (
-                <View className="gap-y-4 mt-2">
-                  {[1, 2, 3, 4, 5, 6].map((i) => (
-                    <Skeleton
-                      key={i}
-                      colorMode="light"
-                      width="100%"
-                      height={60}
-                      radius={16}
-                    />
-                  ))}
-                </View>
-              ) : (
-                <View className="flex-row flex-wrap justify-between mt-2">
-                  {[1, 2, 3, 4].map((i) => (
-                    <View key={i} className="mb-4">
-                      <Skeleton
-                        colorMode="light"
-                        width={gridItemWidth}
-                        height={200}
-                        radius={32}
-                      />
-                    </View>
-                  ))}
-                </View>
-              )}
-            </Skeleton.Group>
-          ) : viewMode === ViewMode.TABLE ? (
-            <InventoryTable
-              products={filteredProducts}
-              loading={loading}
-              onDelete={handleDeletePress} // Now receives product object directly
-              onEdit={handleEditPress}
-            />
-          ) : (
-            <View className="flex-row flex-wrap justify-between">
-              {filteredProducts.map((p) => (
-                <InventoryGridCard
-                  key={p.id}
-                  product={p}
-                  width={gridItemWidth}
-                  onEdit={() => handleEditPress(p)}
-                  onDelete={() => handleDeletePress(p)}
-                />
-              ))}
-            </View>
-          )}
+        <FilterBar
+          activeFilter={activeFilter}
+          setActiveFilter={setFilter}
+          categories={filteredCategories}
+          categorySearch={categorySearch}
+          setCategorySearch={setCategorySearch}
+          loading={loading && categories.length === 0}
+          fontFamily={font.medium}
+        />
+
+        <View style={styles.listHead}>
+          <Text style={[styles.listTitle, typeface(font.bold, "700")]}>
+            Products
+          </Text>
+          <View style={styles.metricToggle}>
+            <Pressable
+              onPress={() => setViewMode(ViewMode.TABLE)}
+              style={[
+                styles.metricChip,
+                viewMode === ViewMode.TABLE && styles.metricChipOn,
+              ]}
+            >
+              <ListIcon
+                size={14}
+                color={viewMode === ViewMode.TABLE ? INK : MUTED}
+              />
+            </Pressable>
+            <Pressable
+              onPress={() => setViewMode(ViewMode.GRID)}
+              style={[
+                styles.metricChip,
+                viewMode === ViewMode.GRID && styles.metricChipOn,
+              ]}
+            >
+              <LayoutGrid
+                size={14}
+                color={viewMode === ViewMode.GRID ? INK : MUTED}
+              />
+            </Pressable>
+          </View>
         </View>
+
+        {loading && products.length === 0 ? (
+          <View style={{ marginTop: 8 }}>
+            {[1, 2, 3, 4, 5, 6].map((i) => (
+              <View key={i} style={{ paddingVertical: 12 }}>
+                <Skeleton colorMode="light" width="100%" height={18} radius={6} />
+              </View>
+            ))}
+          </View>
+        ) : filteredProducts.length === 0 ? (
+          <Text style={[styles.empty, typeface(font.regular, "400")]}>
+            No products match this filter
+          </Text>
+        ) : viewMode === ViewMode.TABLE ? (
+          <InventoryTable
+            products={filteredProducts}
+            onDelete={handleDeletePress}
+            onEdit={handleEditPress}
+            font={font}
+          />
+        ) : (
+          <View style={styles.grid}>
+            {filteredProducts.map((product) => (
+              <InventoryGridCard
+                key={product.id}
+                product={product}
+                width={gridItemWidth}
+                fontFamily={font.semibold}
+                metaFamily={font.medium}
+                onEdit={() => handleEditPress(product)}
+                onDelete={() => handleDeletePress(product)}
+              />
+            ))}
+          </View>
+        )}
       </ScrollView>
 
-      {/* Modals */}
       <CategoryManagerModal
         isOpen={modals.cat}
         onClose={() => setModals((m) => ({ ...m, cat: false }))}
@@ -315,8 +389,6 @@ export default function InventoryScreen(): ReactElement {
         onUpdate={updateProduct}
         onOpenCategoryManager={() => setModals((m) => ({ ...m, cat: true }))}
       />
-
-      {/* Single Global Confirmation Modal */}
       <ConfirmationModal
         visible={modals.delete}
         title="Delete Product"
@@ -335,12 +407,9 @@ export default function InventoryScreen(): ReactElement {
           }
         }}
       />
-    </SafeAreaView>
+    </View>
   );
 }
-
-// ... FilterBar and InventoryGridCard remain unchanged ...
-// (Kept for completeness if you need to copy-paste the whole file)
 
 function FilterBar({
   activeFilter,
@@ -349,90 +418,92 @@ function FilterBar({
   categorySearch,
   setCategorySearch,
   loading,
-}: FilterBarProps): ReactElement {
-  const staticFilters: FilterType[] = [
-    "all",
-    "low-stock",
-    "expired",
-    "out-of-stock",
-    "no-category",
-    "non-perishable",
-  ];
-
+  fontFamily,
+}: {
+  activeFilter: FilterType | string;
+  setActiveFilter: (filter: FilterType | string) => void;
+  categories: Category[];
+  categorySearch: string;
+  setCategorySearch: (text: string) => void;
+  loading?: boolean;
+  fontFamily?: string;
+}): ReactElement {
   return (
-    <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-      <View className="flex-row items-center gap-2 pr-10">
-        {staticFilters.map((f) => (
-          <TouchableOpacity
-            key={f}
-            onPress={() => setActiveFilter(f)}
-            className={cn(
-              "px-4 py-2 rounded-full border h-9",
-              activeFilter === f
-                ? "bg-slate-900 border-slate-900"
-                : "bg-white border-slate-200",
-            )}
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      style={styles.filterScroll}
+      contentContainerStyle={styles.filterRow}
+    >
+      {FILTERS.map((filter) => {
+        const active = activeFilter === filter.id;
+        return (
+          <Pressable
+            key={filter.id}
+            onPress={() => setActiveFilter(filter.id)}
+            style={[styles.chip, active && styles.chipOn]}
           >
             <Text
-              className={cn(
-                "text-[10px] font-black uppercase",
-                activeFilter === f ? "text-white" : "text-slate-500",
-              )}
+              style={[
+                styles.chipText,
+                active && styles.chipTextOn,
+                fontFamily ? { fontFamily } : { fontWeight: "500" },
+              ]}
             >
-              {f.replace("-", " ")}
+              {filter.label}
             </Text>
-          </TouchableOpacity>
-        ))}
-        <View className="w-[1px] h-4 bg-slate-200 mx-1" />
+          </Pressable>
+        );
+      })}
 
-        {loading ? (
-          <View className="flex-row gap-2">
-            <Skeleton colorMode="light" width={100} height={36} radius={20} />
-            <Skeleton colorMode="light" width={100} height={36} radius={20} />
+      <View style={styles.filterRule} />
+
+      {loading ? (
+        <>
+          <Skeleton colorMode="light" width={88} height={30} radius={999} />
+          <Skeleton colorMode="light" width={88} height={30} radius={999} />
+        </>
+      ) : (
+        <>
+          <View style={styles.catSearch}>
+            <TextInput
+              placeholder="Category"
+              placeholderTextColor="#94A3B8"
+              value={categorySearch}
+              onChangeText={setCategorySearch}
+              style={[
+                styles.catInput,
+                fontFamily ? { fontFamily } : { fontWeight: "500" },
+              ]}
+            />
+            {categorySearch.length > 0 ? (
+              <Pressable onPress={() => setCategorySearch("")} hitSlop={6}>
+                <X size={12} color="#94A3B8" />
+              </Pressable>
+            ) : null}
           </View>
-        ) : (
-          <>
-            <View className="flex-row items-center bg-white border border-slate-200 rounded-full h-9 px-3 min-w-[120px]">
-              <TextInput
-                placeholder="Category..."
-                value={categorySearch}
-                onChangeText={setCategorySearch}
-                className="flex-1 text-[10px] font-bold p-0"
-              />
-              {categorySearch.length > 0 && (
-                <TouchableOpacity onPress={() => setCategorySearch("")}>
-                  <X size={12} color="#94a3b8" />
-                </TouchableOpacity>
-              )}
-            </View>
-            {categories.map((cat) => (
-              <TouchableOpacity
+          {categories.map((cat) => {
+            const active = activeFilter === cat.id;
+            return (
+              <Pressable
                 key={cat.id}
                 onPress={() => setActiveFilter(cat.id)}
-                className={cn(
-                  "px-4 py-2 rounded-full border h-9 flex-row items-center gap-1.5",
-                  activeFilter === cat.id
-                    ? "bg-slate-900 border-slate-900"
-                    : "bg-white border-slate-200",
-                )}
+                style={[styles.chip, active && styles.chipOn]}
               >
-                <Tag
-                  size={10}
-                  color={activeFilter === cat.id ? "white" : "#94a3b8"}
-                />
                 <Text
-                  className={cn(
-                    "text-[10px] font-black uppercase",
-                    activeFilter === cat.id ? "text-white" : "text-slate-500",
-                  )}
+                  style={[
+                    styles.chipText,
+                    active && styles.chipTextOn,
+                    fontFamily ? { fontFamily } : { fontWeight: "500" },
+                  ]}
                 >
                   {cat.name}
                 </Text>
-              </TouchableOpacity>
-            ))}
-          </>
-        )}
-      </View>
+              </Pressable>
+            );
+          })}
+        </>
+      )}
     </ScrollView>
   );
 }
@@ -442,122 +513,258 @@ function InventoryGridCard({
   onEdit,
   onDelete,
   width,
+  fontFamily,
+  metaFamily,
 }: {
   product: Product;
   onEdit: () => void;
   onDelete: () => void;
   width: number;
+  fontFamily?: string;
+  metaFamily?: string;
 }): ReactElement {
-  const isExpired =
-    product.expiryDate && new Date(product.expiryDate) < new Date();
-  const isLowStock =
-    product.stockQuantity <= product.lowStockThreshold &&
-    product.stockQuantity > 0;
-  const isOutOfStock = product.stockQuantity === 0;
-
-  const formattedDate = useMemo(() => {
-    if (!product.expiryDate) return "No Expiry";
-    return new Date(product.expiryDate).toLocaleDateString("en-PH", {
-      month: "short",
-      day: "2-digit",
-      year: "numeric",
-    });
-  }, [product.expiryDate]);
+  const expired =
+    !!product.expiryDate && new Date(product.expiryDate) < new Date();
+  const out = product.stockQuantity === 0;
 
   return (
-    <View
-      style={{ width }}
-      className="bg-white border border-slate-100 rounded-[32px] p-5 mb-4 shadow-sm overflow-hidden"
-    >
-      <View className="flex-row justify-between items-center mb-3">
-        <View>
-          <Text className="text-xl font-black text-slate-900 tracking-tight">
-            ₱{product.price.toLocaleString()}
-            <Text className="text-[11px] font-bold text-slate-400"> /pc</Text>
-          </Text>
-          {product.packPrice != null &&
-          product.packPrice > 0 &&
-          product.piecesPerPack != null &&
-          product.piecesPerPack > 1 ? (
-            <Text className="text-[11px] font-bold text-slate-400 mt-0.5">
-              ₱{product.packPrice.toLocaleString()}/{product.piecesPerPack}pk
-            </Text>
-          ) : null}
-        </View>
-        <View
-          className={cn(
-            "w-2.5 h-2.5 rounded-full",
-            isOutOfStock
-              ? "bg-rose-500"
-              : isLowStock
-                ? "bg-amber-500"
-                : "bg-emerald-500",
-          )}
-        />
-      </View>
-
+    <Pressable onPress={onEdit} onLongPress={onDelete} style={[styles.gridCard, { width }]}>
       <Text
-        className="text-lg font-extrabold text-slate-800 mb-1 leading-tight"
+        style={[styles.gridName, fontFamily ? { fontFamily } : { fontWeight: "600" }]}
         numberOfLines={2}
       >
         {product.name}
       </Text>
-
-      <View
-        className={cn(
-          "self-start px-2.5 py-1 rounded-lg mb-4 mt-1",
-          isOutOfStock
-            ? "bg-rose-50"
-            : isLowStock
-              ? "bg-amber-50"
-              : "bg-slate-50",
-        )}
+      <Text
+        style={[
+          styles.gridQty,
+          { color: stockColor(product) },
+          fontFamily ? { fontFamily } : { fontWeight: "700" },
+        ]}
       >
-        <Text
-          className={cn(
-            "text-[10px] font-black uppercase tracking-wider",
-            isOutOfStock
-              ? "text-rose-600"
-              : isLowStock
-                ? "text-amber-600"
-                : "text-slate-500",
-          )}
-        >
-          {isOutOfStock ? "Out of Stock" : `${product.stockQuantity} in Stock`}
-        </Text>
-      </View>
-
-      <View className="flex-row items-center mb-4 gap-1.5">
-        <Calendar size={12} color={isExpired ? "#ef4444" : "#94a3b8"} />
-        <Text
-          className={cn(
-            "text-[11px] font-bold",
-            isExpired ? "text-rose-500" : "text-slate-400",
-          )}
-        >
-          {formattedDate}
-        </Text>
-      </View>
-
-      <View className="flex-row items-center gap-2 pt-3 border-t border-slate-50">
-        <TouchableOpacity
-          onPress={onEdit}
-          activeOpacity={0.8}
-          className="flex-1 h-10 bg-slate-900 rounded-xl items-center justify-center flex-row"
-        >
-          <Edit3 size={14} color="white" />
-          <Text className="text-white text-[11px] font-black ml-2 uppercase">
-            Edit
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          onPress={onDelete}
-          activeOpacity={0.8}
-          className="w-10 h-10 bg-rose-50 rounded-xl items-center justify-center"
-        >
-          <Trash2 size={14} color="#e11d48" />
-        </TouchableOpacity>
-      </View>
-    </View>
+        {out ? "Out of stock" : `${product.stockQuantity} in stock`}
+      </Text>
+      <Text
+        style={[styles.gridMeta, metaFamily ? { fontFamily } : { fontWeight: "500" }]}
+      >
+        ₱{Math.round(product.price).toLocaleString("en-PH")}
+        {product.packPrice != null &&
+        product.packPrice > 0 &&
+        product.piecesPerPack != null &&
+        product.piecesPerPack > 1
+          ? ` · ${product.piecesPerPack}pk`
+          : ""}
+      </Text>
+      <Text
+        style={[
+          styles.gridMeta,
+          { color: expired ? "#E11D48" : MUTED },
+          metaFamily ? { fontFamily } : { fontWeight: "500" },
+        ]}
+      >
+        {product.expiryDate
+          ? new Date(product.expiryDate).toLocaleDateString("en-PH", {
+              month: "short",
+              day: "numeric",
+            })
+          : "No expiry"}
+      </Text>
+    </Pressable>
   );
 }
+
+const styles = StyleSheet.create({
+  screen: {
+    flex: 1,
+    backgroundColor: "#FAFBFD",
+  },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 20,
+  },
+  identity: {
+    flex: 1,
+    marginLeft: 12,
+    marginRight: 8,
+  },
+  title: {
+    fontSize: 20,
+    color: INK,
+    letterSpacing: -0.4,
+  },
+  subtitle: {
+    marginTop: 3,
+    fontSize: 13,
+    color: MUTED,
+  },
+  iconBtn: {
+    width: 40,
+    height: 40,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  addBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: TINT,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  stats: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 16,
+    paddingVertical: 4,
+  },
+  statWrap: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  stat: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "baseline",
+    gap: 6,
+  },
+  statRule: {
+    width: StyleSheet.hairlineWidth,
+    height: 18,
+    backgroundColor: "rgba(15, 23, 42, 0.12)",
+    marginRight: 12,
+  },
+  statValue: {
+    fontSize: 18,
+    letterSpacing: -0.4,
+    fontVariant: ["tabular-nums"],
+  },
+  statLabel: {
+    fontSize: 13,
+    color: MUTED,
+  },
+  statLabelOn: {
+    color: INK,
+  },
+  search: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#EEF1F6",
+    borderRadius: 16,
+    paddingHorizontal: 14,
+    height: 46,
+  },
+  searchInput: {
+    flex: 1,
+    marginLeft: 8,
+    fontSize: 14,
+    color: INK,
+    paddingVertical: 0,
+  },
+  filterScroll: {
+    marginTop: 12,
+    marginHorizontal: -22,
+  },
+  filterRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: 22,
+  },
+  chip: {
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 999,
+    backgroundColor: "#EEF1F6",
+  },
+  chipOn: {
+    backgroundColor: TINT,
+  },
+  chipText: {
+    fontSize: 13,
+    color: INK,
+  },
+  chipTextOn: {
+    color: "#FFFFFF",
+  },
+  filterRule: {
+    width: StyleSheet.hairlineWidth,
+    height: 16,
+    backgroundColor: "rgba(15, 23, 42, 0.16)",
+    marginHorizontal: 4,
+  },
+  catSearch: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#EEF1F6",
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    height: 32,
+    minWidth: 108,
+  },
+  catInput: {
+    flex: 1,
+    fontSize: 13,
+    color: INK,
+    paddingVertical: 0,
+    minWidth: 72,
+  },
+  listHead: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginTop: 28,
+    marginBottom: 4,
+  },
+  listTitle: {
+    fontSize: 13,
+    color: INK,
+    letterSpacing: 0.8,
+    textTransform: "uppercase",
+  },
+  metricToggle: {
+    flexDirection: "row",
+    backgroundColor: "#EEF1F6",
+    borderRadius: 999,
+    padding: 3,
+  },
+  metricChip: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+  },
+  metricChipOn: {
+    backgroundColor: "#FFFFFF",
+  },
+  empty: {
+    paddingVertical: 20,
+    fontSize: 14,
+    color: MUTED,
+  },
+  grid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "space-between",
+  },
+  gridCard: {
+    backgroundColor: "#F4F6FA",
+    borderRadius: 20,
+    padding: 14,
+    marginBottom: 12,
+  },
+  gridName: {
+    fontSize: 15,
+    color: INK,
+    marginBottom: 8,
+    minHeight: 38,
+  },
+  gridQty: {
+    fontSize: 13,
+    marginBottom: 4,
+  },
+  gridMeta: {
+    fontSize: 12,
+    color: MUTED,
+  },
+});

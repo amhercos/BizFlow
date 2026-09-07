@@ -1,40 +1,20 @@
-import { DrawerActions } from "@react-navigation/native";
+import { DrawerMenuButton } from "@/components/navigation/DrawerMenuButton";
 import { Tabs } from "expo-router";
 import {
   LayoutDashboard,
-  Menu,
   Package,
   Receipt,
   ShoppingCart,
   Tag,
 } from "lucide-react-native";
-import React, { memo, useCallback, useMemo } from "react";
+import React, { useMemo } from "react";
 import {
   Platform,
   StyleSheet,
-  TouchableOpacity,
   View,
   useWindowDimensions,
 } from "react-native";
 import { TabBarCurve } from "../../components/navigation/TabBarCurve";
-import { drawerNavigationRef } from "../../src/utils/drawerRef";
-
-const DrawerTrigger = memo((): React.JSX.Element => {
-  const handleOpenDrawer = useCallback((): void => {
-    drawerNavigationRef.current?.dispatch(DrawerActions.openDrawer());
-  }, []);
-
-  return (
-    <TouchableOpacity
-      onPress={handleOpenDrawer}
-      style={styles.headerButton}
-      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-    >
-      <Menu size={20} color="#0f172a" strokeWidth={2.2} />
-    </TouchableOpacity>
-  );
-});
-DrawerTrigger.displayName = "DrawerTrigger";
 
 export default function TabLayout(): React.JSX.Element {
   const { width } = useWindowDimensions();
@@ -49,7 +29,11 @@ export default function TabLayout(): React.JSX.Element {
         height: Platform.OS === "ios" ? 110 : 70,
       },
       headerTitleStyle: styles.headerTitle,
-      headerLeft: () => <DrawerTrigger />,
+      headerLeft: () => (
+        <View style={styles.headerLeft}>
+          <DrawerMenuButton />
+        </View>
+      ),
       tabBarActiveTintColor: "#2563eb",
       tabBarInactiveTintColor: "#0f172a",
       tabBarLabelStyle: styles.tabLabel,
@@ -71,6 +55,7 @@ export default function TabLayout(): React.JSX.Element {
       <Tabs.Screen
         name="dashboard"
         options={{
+          headerShown: false,
           title: "Home",
           tabBarLabel: "Home",
           tabBarIcon: ({ color }: { color: string }) => (
@@ -81,6 +66,7 @@ export default function TabLayout(): React.JSX.Element {
       <Tabs.Screen
         name="inventory"
         options={{
+          headerShown: false,
           title: "Inventory",
           tabBarLabel: "Stocks",
           tabBarIcon: ({ color }: { color: string }) => (
@@ -133,17 +119,17 @@ export default function TabLayout(): React.JSX.Element {
       />
 
       <Tabs.Screen name="settings" options={{ href: null }} />
-      <Tabs.Screen name="reports" options={{ title: "Reports", href: null }} />
+      <Tabs.Screen
+        name="reports"
+        options={{ title: "Reports", href: null, headerShown: false }}
+      />
     </Tabs>
   );
 }
 
 const styles = StyleSheet.create({
-  headerButton: {
-    marginLeft: 20,
-    padding: 8,
-    backgroundColor: "#f1f5f9",
-    borderRadius: 10,
+  headerLeft: {
+    marginLeft: 12,
   },
   headerTitle: { fontWeight: "800", fontSize: 17, color: "#0f172a" },
   tabLabel: { fontWeight: "700", fontSize: 10 },
