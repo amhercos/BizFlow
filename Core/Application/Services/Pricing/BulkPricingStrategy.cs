@@ -1,7 +1,6 @@
 ﻿using Application.Interfaces.Repositories;
 using Domain.Entities;
 using Domain.Entities.Enums;
-using System;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -23,15 +22,19 @@ namespace Application.Services.Pricing
 
             foreach (var tier in sortedTiers)
             {
+                if (tier.Quantity <= 0)
+                    continue;
+
                 if (remainingQuantity >= tier.Quantity)
                 {
                     int numberOfPacks = remainingQuantity / tier.Quantity;
-                    total += numberOfPacks * Math.Round(tier.Quantity * tier.Price, 2, MidpointRounding.AwayFromZero);
+                    // Tier.Price is the deal price for the whole pack (e.g. 3 for ₱80), not a unit price.
+                    total += numberOfPacks * tier.Price;
                     remainingQuantity %= tier.Quantity;
                 }
             }
 
-            total += (remainingQuantity * product.Price);
+            total += remainingQuantity * product.Price;
 
             return total;
         }
