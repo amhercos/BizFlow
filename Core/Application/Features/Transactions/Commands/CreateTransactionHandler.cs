@@ -64,15 +64,28 @@ public class CreateTransactionHandler(
                 });
             }
 
+            // Price every line against the original retail basket so bundle tie-up
+            // math is not affected by another line's already-discounted unit price.
+            var discountedLineTotals = new Dictionary<Guid, decimal>();
             foreach (var item in transaction.Items)
             {
                 var product = productMap[item.ProductId];
 
                 if (request.PaymentType != PaymentType.Credit && item.UnitType == "Piece")
                 {
-                    var lineTotal = promotionEngine.CalculateLineTotal(product, item.Quantity, transaction.Items);
-                    item.UnitPrice = Math.Round(lineTotal / item.Quantity, 2, MidpointRounding.AwayFromZero);
+                    discountedLineTotals[item.Id] = promotionEngine.CalculateLineTotal(
+                        product,
+                        item.Quantity,
+                        transaction.Items);
                 }
+            }
+
+            foreach (var item in transaction.Items)
+            {
+                if (!discountedLineTotals.TryGetValue(item.Id, out var lineTotal) || item.Quantity <= 0)
+                    continue;
+
+                item.UnitPrice = Math.Round(lineTotal / item.Quantity, 2, MidpointRounding.AwayFromZero);
             }
 
             transaction.TotalAmount = Math.Round(transaction.Items.Sum(x => x.Quantity * x.UnitPrice), 2, MidpointRounding.AwayFromZero);
