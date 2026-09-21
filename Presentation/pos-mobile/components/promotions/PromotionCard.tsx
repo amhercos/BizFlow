@@ -42,8 +42,7 @@ export default function PromotionCard({
   const isBundle =
     promotion.type === PromotionType.Bundle || promotion.type === "Bundle";
   const isDiscount =
-    promotion.type === PromotionType.Discount ||
-    promotion.type === "Discount";
+    promotion.type === PromotionType.Discount || promotion.type === "Discount";
 
   const flatPrice = promotion.tiers[0]?.price ?? 0;
   const basePrice = promotion.originalPrice ?? 0;
@@ -72,12 +71,16 @@ export default function PromotionCard({
               numberOfLines={1}
               style={[styles.meta, typeface(font.medium, "500")]}
             >
-              With {promotion.tieUpProductName}
+              Buy {promotion.tiers[0]?.quantity ?? 1} with{" "}
+              {promotion.tieUpQuantity ?? 1} {promotion.tieUpProductName}
             </Text>
           ) : null}
         </View>
         <View
-          style={[styles.statusPill, paused ? styles.statusPaused : styles.statusLive]}
+          style={[
+            styles.statusPill,
+            paused ? styles.statusPaused : styles.statusLive,
+          ]}
         >
           <Text
             style={[
