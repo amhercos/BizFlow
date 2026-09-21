@@ -1,5 +1,5 @@
 import { typeface, useInter } from "@/src/theme/typography";
-import { Plus, Trash2, X } from "lucide-react-native";
+import { Trash2, X } from "lucide-react-native";
 import React, { useState } from "react";
 import {
   ActivityIndicator,
@@ -42,6 +42,9 @@ export default function EditPromotionModal({
   const font = useInter();
   const { updatePromotion, isProcessing } = usePromotions();
   const [name, setName] = useState(promotion.name);
+  const [tieUpQuantity, setTieUpQuantity] = useState(
+    promotion.tieUpQuantity ?? 1,
+  );
   const [tiers, setTiers] = useState(() =>
     promotion.tiers.map((tier) => ({
       id: tier.id,
@@ -55,8 +58,7 @@ export default function EditPromotionModal({
   const isBundle =
     promotion.type === PromotionType.Bundle || promotion.type === "Bundle";
   const isDiscount =
-    promotion.type === PromotionType.Discount ||
-    promotion.type === "Discount";
+    promotion.type === PromotionType.Discount || promotion.type === "Discount";
 
   const hint = isDiscount
     ? "One promo price"
@@ -91,7 +93,7 @@ export default function EditPromotionModal({
         price: tier.price,
       })),
       tieUpProductId: promotion.tieUpProductId,
-      tieUpQuantity: promotion.tieUpQuantity,
+      tieUpQuantity: isBundle ? tieUpQuantity : null,
     };
 
     updatePromotion(payload, {
@@ -111,10 +113,7 @@ export default function EditPromotionModal({
         style={styles.backdrop}
       >
         <View
-          style={[
-            styles.sheet,
-            { paddingBottom: Math.max(insets.bottom, 16) },
-          ]}
+          style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, 16) }]}
         >
           <View style={styles.header}>
             <View style={styles.identity}>
@@ -128,7 +127,11 @@ export default function EditPromotionModal({
                 {promotion.productName ?? "Unknown item"} · {hint}
               </Text>
             </View>
-            <TouchableOpacity onPress={onClose} style={styles.close} hitSlop={8}>
+            <TouchableOpacity
+              onPress={onClose}
+              style={styles.close}
+              hitSlop={8}
+            >
               <X size={18} color={INK} />
             </TouchableOpacity>
           </View>
@@ -180,12 +183,12 @@ export default function EditPromotionModal({
 
             {tiers.map((tier, index) => (
               <View key={index} style={styles.tierRow}>
-                {isBulk ? (
+                {isBulk || isBundle ? (
                   <View style={styles.qtyField}>
                     <Text
                       style={[styles.fieldHint, typeface(font.medium, "500")]}
                     >
-                      Qty
+                      {isBundle ? "Primary Qty" : "Qty"}
                     </Text>
                     <TextInput
                       keyboardType="number-pad"
@@ -197,9 +200,37 @@ export default function EditPromotionModal({
                     />
                   </View>
                 ) : null}
+
+                {isBundle ? (
+                  <View style={styles.qtyField}>
+                    <Text
+                      style={[styles.fieldHint, typeface(font.medium, "500")]}
+                    >
+                      Tie-up Qty
+                    </Text>
+                    <TextInput
+                      keyboardType="number-pad"
+                      value={tieUpQuantity === 0 ? "" : String(tieUpQuantity)}
+                      onChangeText={(value) => {
+                        const cleaned = value.replace(/[^0-9]/g, "");
+                        setTieUpQuantity(
+                          cleaned === "" ? 0 : parseInt(cleaned, 10),
+                        );
+                      }}
+                      style={[styles.input, typeface(font.medium, "500")]}
+                    />
+                  </View>
+                ) : null}
+
                 <View style={styles.priceField}>
-                  <Text style={[styles.fieldHint, typeface(font.medium, "500")]}>
-                    {isBulk ? "Pack price" : "Price"}
+                  <Text
+                    style={[styles.fieldHint, typeface(font.medium, "500")]}
+                  >
+                    {isBulk
+                      ? "Pack price"
+                      : isBundle
+                        ? "Bundle price"
+                        : "Price"}
                   </Text>
                   <TextInput
                     keyboardType="decimal-pad"
@@ -237,7 +268,9 @@ export default function EditPromotionModal({
               {isProcessing ? (
                 <ActivityIndicator color="#FFFFFF" />
               ) : (
-                <Text style={[styles.submitText, typeface(font.semibold, "600")]}>
+                <Text
+                  style={[styles.submitText, typeface(font.semibold, "600")]}
+                >
                   Save changes
                 </Text>
               )}
