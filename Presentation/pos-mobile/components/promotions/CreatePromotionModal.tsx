@@ -1,11 +1,6 @@
 import { typeface, useInter } from "@/src/theme/typography";
 import type { Product } from "@/src/types/inventory";
-import {
-  Check,
-  Search,
-  Trash2,
-  X,
-} from "lucide-react-native";
+import { Check, Search, Trash2, X } from "lucide-react-native";
 import React, { useMemo, useState } from "react";
 import {
   ActivityIndicator,
@@ -42,9 +37,17 @@ interface CreatePromotionModalProps {
 type TierInput = Omit<PromotionTier, "id" | "promotionId">;
 
 const STRATEGIES: { id: PromotionType; label: string; hint: string }[] = [
-  { id: PromotionType.Discount, label: "Discount", hint: "One promo price" },
-  { id: PromotionType.Bulk, label: "Bulk", hint: "Quantity breaks" },
-  { id: PromotionType.Bundle, label: "Bundle", hint: "Buy with another item" },
+  {
+    id: PromotionType.Discount,
+    label: "Discount",
+    hint: "Single item promo price",
+  },
+  { id: PromotionType.Bulk, label: "Bulk", hint: "Quantity price breaks" },
+  {
+    id: PromotionType.Bundle,
+    label: "Bundle",
+    hint: "Set fixed price for two items",
+  },
 ];
 
 export default function CreatePromotionModal({
@@ -62,13 +65,22 @@ export default function CreatePromotionModal({
   const [productSearch, setProductSearch] = useState("");
   const [tieUpProductId, setTieUpProductId] = useState<string | null>(null);
   const [tieUpSearch, setTieUpSearch] = useState("");
-  const [tieUpQuantity] = useState(1);
+  const [tieUpQuantity, setTieUpQuantity] = useState(1);
   const [tiers, setTiers] = useState<TierInput[]>([{ quantity: 1, price: 0 }]);
 
   const isBulk = type === PromotionType.Bulk;
   const isBundle = type === PromotionType.Bundle;
-  const isDiscount = type === PromotionType.Discount;
   const hint = STRATEGIES.find((item) => item.id === type)?.hint ?? "";
+
+  const selectedPrimaryProduct = useMemo(
+    () => products?.find((p) => p.id === selectedProductId),
+    [products, selectedProductId],
+  );
+
+  const selectedSecondaryProduct = useMemo(
+    () => products?.find((p) => p.id === tieUpProductId),
+    [products, tieUpProductId],
+  );
 
   const reset = () => {
     setName("");
@@ -76,6 +88,7 @@ export default function CreatePromotionModal({
     setProductSearch("");
     setTieUpProductId(null);
     setTieUpSearch("");
+    setTieUpQuantity(1);
     setTiers([{ quantity: 1, price: 0 }]);
   };
 
@@ -103,12 +116,13 @@ export default function CreatePromotionModal({
       type,
       mainProductId: selectedProductId,
       isActive: true,
-      tiers: (isBulk ? tiers : [{ quantity: 1, price: tiers[0].price }]).map(
-        (tier) => ({
-          quantity: tier.quantity,
-          price: tier.price,
-        }),
-      ),
+      tiers: (isBulk || isBundle
+        ? tiers
+        : [{ quantity: 1, price: tiers[0].price }]
+      ).map((tier) => ({
+        quantity: tier.quantity,
+        price: tier.price,
+      })),
       tieUpProductId: isBundle ? tieUpProductId : null,
       tieUpQuantity: isBundle ? tieUpQuantity : null,
     };
@@ -153,10 +167,7 @@ export default function CreatePromotionModal({
         style={styles.backdrop}
       >
         <View
-          style={[
-            styles.sheet,
-            { paddingBottom: Math.max(insets.bottom, 16) },
-          ]}
+          style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, 16) }]}
         >
           <View style={styles.header}>
             <View style={styles.identity}>
@@ -167,7 +178,11 @@ export default function CreatePromotionModal({
                 {hint}
               </Text>
             </View>
-            <TouchableOpacity onPress={onClose} style={styles.close} hitSlop={8}>
+            <TouchableOpacity
+              onPress={onClose}
+              style={styles.close}
+              hitSlop={8}
+            >
               <X size={18} color={INK} />
             </TouchableOpacity>
           </View>
@@ -177,6 +192,7 @@ export default function CreatePromotionModal({
             keyboardShouldPersistTaps="handled"
             contentContainerStyle={styles.body}
           >
+            {/* Strategy Segment Picker */}
             <View style={styles.segment}>
               {STRATEGIES.map((item) => {
                 const active = type === item.id;
@@ -203,9 +219,10 @@ export default function CreatePromotionModal({
               })}
             </View>
 
-            <Field label="Name" font={font}>
+            {/* Promo Name */}
+            <Field label="Promo Title" font={font}>
               <TextInput
-                placeholder="Weekend deal"
+                placeholder="e.g. Buy 1 Coffee get 2 Cookie"
                 placeholderTextColor="#94A3B8"
                 value={name}
                 onChangeText={setName}
@@ -213,31 +230,12 @@ export default function CreatePromotionModal({
               />
             </Field>
 
+            {/* Product Selectors */}
             {isBundle ? (
               <>
                 <ProductPicker
-                  label="Pair with"
-                  placeholder="Search required item"
-                  query={tieUpSearch}
-                  selectedId={tieUpProductId}
-                  results={filteredTieUpProducts}
-                  onChangeQuery={(value) => {
-                    setTieUpSearch(value);
-                    if (tieUpProductId) setTieUpProductId(null);
-                  }}
-                  onSelect={(item) => {
-                    setTieUpProductId(item.id);
-                    setTieUpSearch(item.name);
-                  }}
-                  onClear={() => {
-                    setTieUpProductId(null);
-                    setTieUpSearch("");
-                  }}
-                  font={font}
-                />
-                <ProductPicker
-                  label="Discounted item"
-                  placeholder="Search item on promo"
+                  label="Primary Product (Product A)"
+                  placeholder="Search main product (e.g., Coffee)"
                   query={productSearch}
                   selectedId={selectedProductId}
                   results={filteredMainProducts}
@@ -252,6 +250,26 @@ export default function CreatePromotionModal({
                   onClear={() => {
                     setSelectedProductId("");
                     setProductSearch("");
+                  }}
+                  font={font}
+                />
+                <ProductPicker
+                  label="Pair Product (Product B)"
+                  placeholder="Search pair product (e.g., Cookie)"
+                  query={tieUpSearch}
+                  selectedId={tieUpProductId}
+                  results={filteredTieUpProducts}
+                  onChangeQuery={(value) => {
+                    setTieUpSearch(value);
+                    if (tieUpProductId) setTieUpProductId(null);
+                  }}
+                  onSelect={(item) => {
+                    setTieUpProductId(item.id);
+                    setTieUpSearch(item.name);
+                  }}
+                  onClear={() => {
+                    setTieUpProductId(null);
+                    setTieUpSearch("");
                   }}
                   font={font}
                 />
@@ -279,9 +297,14 @@ export default function CreatePromotionModal({
               />
             )}
 
+            {/* Quantities and Pricing Header */}
             <View style={styles.priceHead}>
               <Text style={[styles.label, typeface(font.medium, "500")]}>
-                {isBulk ? "Price breaks" : "Promo price"}
+                {isBulk
+                  ? "Price breaks"
+                  : isBundle
+                    ? "Bundle Configuration"
+                    : "Promo Price"}
               </Text>
               {isBulk ? (
                 <Pressable
@@ -297,12 +320,15 @@ export default function CreatePromotionModal({
               ) : null}
             </View>
 
+            {/* Tier Inputs */}
             {tiers.map((tier, index) => (
               <View key={index} style={styles.tierRow}>
-                {isBulk ? (
+                {isBulk || isBundle ? (
                   <View style={styles.qtyField}>
-                    <Text style={[styles.fieldHint, typeface(font.medium, "500")]}>
-                      Qty
+                    <Text
+                      style={[styles.fieldHint, typeface(font.medium, "500")]}
+                    >
+                      {isBundle ? "Main Product" : "Qty"}
                     </Text>
                     <TextInput
                       keyboardType="number-pad"
@@ -316,14 +342,40 @@ export default function CreatePromotionModal({
                     />
                   </View>
                 ) : null}
-                <View style={styles.priceField}>
-                  {isBulk ? (
+
+                {isBundle ? (
+                  <View style={styles.qtyField}>
                     <Text
                       style={[styles.fieldHint, typeface(font.medium, "500")]}
                     >
-                      Pack price
+                      Tie Up Qty
                     </Text>
-                  ) : null}
+                    <TextInput
+                      keyboardType="number-pad"
+                      value={tieUpQuantity === 0 ? "" : String(tieUpQuantity)}
+                      onChangeText={(value) => {
+                        const cleaned = value.replace(/[^0-9]/g, "");
+                        setTieUpQuantity(
+                          cleaned === "" ? 0 : parseInt(cleaned, 10),
+                        );
+                      }}
+                      placeholder="1"
+                      placeholderTextColor="#94A3B8"
+                      style={[styles.input, typeface(font.medium, "500")]}
+                    />
+                  </View>
+                ) : null}
+
+                <View style={styles.priceField}>
+                  <Text
+                    style={[styles.fieldHint, typeface(font.medium, "500")]}
+                  >
+                    {isBulk
+                      ? "Pack price"
+                      : isBundle
+                        ? "Total Bundle Price"
+                        : "Promo price"}
+                  </Text>
                   <TextInput
                     keyboardType="decimal-pad"
                     value={tier.price === 0 ? "" : String(tier.price)}
@@ -360,7 +412,9 @@ export default function CreatePromotionModal({
               {isProcessing ? (
                 <ActivityIndicator color="#FFFFFF" />
               ) : (
-                <Text style={[styles.submitText, typeface(font.semibold, "600")]}>
+                <Text
+                  style={[styles.submitText, typeface(font.semibold, "600")]}
+                >
                   Save promo
                 </Text>
               )}
@@ -450,10 +504,7 @@ function ProductPicker({
             results.map((item, index) => (
               <View key={item.id}>
                 {index > 0 ? <View style={styles.hairline} /> : null}
-                <Pressable
-                  onPress={() => onSelect(item)}
-                  style={styles.option}
-                >
+                <Pressable onPress={() => onSelect(item)} style={styles.option}>
                   <Text
                     numberOfLines={1}
                     style={[styles.optionText, typeface(font.medium, "500")]}
@@ -621,7 +672,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   qtyField: {
-    width: 88,
+    width: 82,
   },
   priceField: {
     flex: 1,
@@ -632,6 +683,28 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     marginBottom: 0,
+  },
+  previewCard: {
+    backgroundColor: "#EFF6FF",
+    borderRadius: 14,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: "#BFDBFE",
+    gap: 6,
+  },
+  previewHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  previewTitle: {
+    fontSize: 13,
+    color: TINT,
+  },
+  previewText: {
+    fontSize: 13,
+    color: MUTED,
+    lineHeight: 18,
   },
   footer: {
     paddingHorizontal: 22,

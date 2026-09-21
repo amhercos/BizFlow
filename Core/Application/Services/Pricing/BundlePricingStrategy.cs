@@ -11,9 +11,9 @@ namespace Application.Services.Pricing
     {
         public PromotionType Type => PromotionType.Bundle;
 
-        public decimal CalculateLineTotal(Product product, Promotion promo, int quantity, IEnumerable<TransactionItem> basket)
+        public decimal CalculateLineTotal(Product primaryProduct, Promotion promo, int primaryQuantity, IEnumerable<TransactionItem> basket)
         {
-            decimal originalTotal = quantity * product.Price;
+            decimal originalTotal = primaryQuantity * primaryProduct.Price;
 
             if (!promo.IsActive || promo.TieUpProductId == null || promo.Tiers == null || !promo.Tiers.Any())
             {
@@ -21,33 +21,50 @@ namespace Application.Services.Pricing
             }
 
             var bundleTier = promo.Tiers.OrderBy(t => t.Quantity).FirstOrDefault();
-            if (bundleTier == null)
+            if (bundleTier == null) return originalTotal;
+
+            // 1. Define required quantities (e.g., 2 Product A + 3 Product B)
+            int primaryRequiredQty = bundleTier.Quantity > 0 ? bundleTier.Quantity : 1;
+            int secondaryRequiredQty = promo.TieUpQuantity is > 0 ? promo.TieUpQuantity.Value : 1;
+            decimal fixedBundlePrice = bundleTier.Price; // The complete bundle deal price
+
+            // 2. Find secondary item in basket
+            var secondaryItem = basket.FirstOrDefault(i => i.ProductId == promo.TieUpProductId);
+            int secondaryInCart = secondaryItem?.Quantity ?? 0;
+            decimal secondaryUnitPrice = secondaryItem?.UnitPrice ?? 0;
+
+            // 3. Determine maximum complete bundle triggers
+            int completeBundles = Math.Min(
+                primaryQuantity / primaryRequiredQty,
+                secondaryInCart / secondaryRequiredQty
+            );
+
+            if (completeBundles <= 0)
             {
                 return originalTotal;
             }
 
-            var tieUpItem = basket.FirstOrDefault(i => i.ProductId == promo.TieUpProductId);
-            int tieUpInCart = tieUpItem?.Quantity ?? 0;
+            // 4. Calculate standard un-discounted cost of 1 bundle set
+            decimal primarySetCost = primaryRequiredQty * primaryProduct.Price;
+            decimal secondarySetCost = secondaryRequiredQty * secondaryUnitPrice;
+            decimal standardBundleCost = primarySetCost + secondarySetCost;
 
-            int mainRequiredQty = bundleTier.Quantity > 0 ? bundleTier.Quantity : 1;
-            int tieUpRequiredQty = promo.TieUpQuantity is > 0 ? promo.TieUpQuantity.Value : 1;
-
-            int possibleBundlesByMain = quantity / mainRequiredQty;
-            int possibleBundlesByTieUp = tieUpInCart / tieUpRequiredQty;
-            int applicableBundleCount = Math.Min(possibleBundlesByMain, possibleBundlesByTieUp);
-
-            if (applicableBundleCount <= 0)
+            if (standardBundleCost <= fixedBundlePrice)
             {
-                return originalTotal;
+                return originalTotal; // No discount if regular price is cheaper than bundle price
             }
 
-            decimal tieUpUnitPrice = tieUpItem?.UnitPrice ?? 0;
-            decimal standardComboCost =
-                (mainRequiredQty * product.Price) + (tieUpRequiredQty * tieUpUnitPrice);
-            decimal packageDealSavings = Math.Max(0, standardComboCost - bundleTier.Price);
-            decimal totalSavings = packageDealSavings * applicableBundleCount;
+            // 5. Total discount saved per bundle set
+            decimal totalDiscountPerBundle = standardBundleCost - fixedBundlePrice;
 
-            return Math.Max(0, originalTotal - totalSavings);
+            // 6. Calculate primary product's proportional share of the discount
+            decimal primaryDiscountShareRatio = primarySetCost / standardBundleCost;
+            decimal primaryDiscountPerBundle = totalDiscountPerBundle * primaryDiscountShareRatio;
+
+            // 7. Apply discount for all completed bundle sets
+            decimal totalPrimaryDiscount = primaryDiscountPerBundle * completeBundles;
+
+            return Math.Max(0, originalTotal - totalPrimaryDiscount);
         }
     }
 }
