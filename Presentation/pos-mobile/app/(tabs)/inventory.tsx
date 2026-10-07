@@ -5,25 +5,25 @@ import { typeface, useInter } from "@/src/theme/typography";
 import type { Category, Product } from "@/src/types/inventory";
 import * as Haptics from "expo-haptics";
 import {
-  FolderPlus,
-  LayoutGrid,
-  List as ListIcon,
-  Plus,
-  Search,
-  X,
+    FolderPlus,
+    LayoutGrid,
+    List as ListIcon,
+    Plus,
+    Search,
+    X,
 } from "lucide-react-native";
 import { Skeleton } from "moti/skeleton";
 import React, { ReactElement, useCallback, useMemo, useState } from "react";
 import {
-  Pressable,
-  RefreshControl,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
-  useWindowDimensions,
+    Pressable,
+    RefreshControl,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
+    useWindowDimensions,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 

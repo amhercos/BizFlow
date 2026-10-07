@@ -24,6 +24,12 @@ public class CreateTransactionHandler(
         var products = await productRepository.GetByIdsWithPromotionsAsync(productIds, storeId, ct);
         var productMap = products.ToDictionary(p => p.Id);
 
+        // Load all active promotions for the store including Tiers
+        var activePromotions = await context.Promotions
+            .Include(p => p.Tiers)
+            .Where(p => p.StoreId == storeId && p.IsActive && !p.IsDeleted)
+            .ToListAsync(ct);
+
         using var dbTransaction = await context.Database.BeginTransactionAsync(ct);
         try
         {
@@ -64,8 +70,7 @@ public class CreateTransactionHandler(
                 });
             }
 
-            // Price every line against the original retail basket so bundle tie-up
-            // math is not affected by another line's already-discounted unit price.
+            // Price every line against active store promotions
             var discountedLineTotals = new Dictionary<Guid, decimal>();
             foreach (var item in transaction.Items)
             {
@@ -76,7 +81,8 @@ public class CreateTransactionHandler(
                     discountedLineTotals[item.Id] = promotionEngine.CalculateLineTotal(
                         product,
                         item.Quantity,
-                        transaction.Items);
+                        transaction.Items,
+                        activePromotions); // <-- Pass activePromotions here
                 }
             }
 

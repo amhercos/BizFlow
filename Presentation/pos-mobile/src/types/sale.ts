@@ -31,6 +31,7 @@ export interface AppliedPromotion {
   name: string;
   isActive: boolean;
   promotionType: "Discount" | "Bulk" | "Bundle" | string;
+  mainProductId?: string | null;
   tiers: {
     quantity: number;
     price: number;
