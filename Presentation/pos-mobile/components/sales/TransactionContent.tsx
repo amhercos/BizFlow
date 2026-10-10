@@ -41,6 +41,7 @@ interface TransactionContentProps {
     nextQty: number,
   ) => void;
   removeItem: (productId: string, unitType: UnitType) => void;
+  toggleFree: (productId: string, unitType: UnitType, isFree: boolean) => void;
   credits: CustomerCredit[];
   selectedCreditId: string;
   setSelectedCreditId: (s: string) => void;
@@ -57,6 +58,8 @@ interface TransactionContentProps {
     creditTotal: number;
     savings: number;
     promotionsApplied: AppliedPromoLine[];
+    freebieCount: number;
+    freebieValue: number;
   };
   isTablet?: boolean;
 }
@@ -73,6 +76,7 @@ export const TransactionContent = memo<TransactionContentProps>(
     onClose,
     updateQuantity,
     removeItem,
+    toggleFree,
     credits,
     selectedCreditId,
     setSelectedCreditId,
@@ -100,7 +104,7 @@ export const TransactionContent = memo<TransactionContentProps>(
       () =>
         isSubmitting ||
         basket.length === 0 ||
-        (!isCredit && (cashReceived === 0 || currentChangeAmount < 0)) ||
+        (!isCredit && currentTargetTotal > 0 && (cashReceived === 0 || currentChangeAmount < 0)) ||
         (isCredit && !isNewCustomer && !selectedCreditId) ||
         (isCredit && isNewCustomer && !newCustomerName),
       [
@@ -148,6 +152,8 @@ export const TransactionContent = memo<TransactionContentProps>(
         isCalculating={false}
         amountTendered={!isCredit ? cashReceived : 0}
         promotions={isCredit ? [] : totals.promotionsApplied}
+        freebieCount={totals.freebieCount}
+        freebieValue={totals.freebieValue}
       />
     );
 
@@ -184,6 +190,7 @@ export const TransactionContent = memo<TransactionContentProps>(
                 basket={basket}
                 updateQuantity={updateQuantity}
                 removeItem={removeItem}
+                toggleFree={toggleFree}
               />
             </View>
             <View style={styles.divider} />
@@ -204,6 +211,7 @@ export const TransactionContent = memo<TransactionContentProps>(
                 basket={basket}
                 updateQuantity={updateQuantity}
                 removeItem={removeItem}
+                toggleFree={toggleFree}
               />
             </View>
             <View style={styles.phonePay}>

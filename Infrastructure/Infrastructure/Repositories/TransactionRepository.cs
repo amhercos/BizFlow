@@ -1,4 +1,4 @@
-﻿using Application.Interfaces;
+using Application.Interfaces;
 using Application.Interfaces.Repositories;
 using Domain.Entities;
 using Infrastructure.Persistence;
@@ -46,7 +46,7 @@ public class TransactionRepository(PosDbContext context, ICurrentUserService cur
     {
         return await context.Transactions
             .AsNoTracking()
-            .CountAsync(t => t.StoreId == storeId && t.TransactionDate >= startUtc, ct);
+            .CountAsync(t => t.StoreId == storeId && t.TransactionDate >= startUtc && t.TotalAmount > 0, ct);
     }
 
     public async Task<(List<Transaction> Items, int TotalCount)> GetRecentTransactionsAsync(

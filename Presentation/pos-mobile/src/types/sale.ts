@@ -51,6 +51,7 @@ export interface BasketItem {
   piecesPerPack: number;
   packPrice: number;
   retailPrice: number;
+  isFree?: boolean;
   promotions?: AppliedPromotion[];
 }
 
@@ -72,6 +73,7 @@ export interface CreateTransactionCommand {
     isPack: boolean;
     unitPrice: number;
     subTotal: number;
+    isFree?: boolean;
   }[];
   paymentType: PaymentType;
   totalAmount: number;

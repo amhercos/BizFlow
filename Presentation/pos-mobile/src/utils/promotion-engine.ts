@@ -16,7 +16,12 @@ function round2(value: number): number {
   return Math.round((value + Number.EPSILON) * 100) / 100;
 }
 
-function resolvePromoType(promo: {
+/** Whole centavos: promo math is done in integers so totals never drift. */
+function toCents(value: number): number {
+  return Math.round((Number(value) || 0) * 100);
+}
+
+export function resolvePromoType(promo: {
   promotionType?: string | number;
   type?: string | number;
 }): string {
@@ -90,29 +95,35 @@ export function calculateLineTotal(
   item: BasketItem,
   fullBasket: BasketItem[],
 ): LineCalculation {
+  // Free items are given away: they cost nothing and are not part of the sale.
+  if (item.isFree) {
+    return {
+      discountedTotal: 0,
+      originalTotal: 0,
+      savings: 0,
+      appliedPromotionName: null,
+    };
+  }
+
   const originalTotal = round2(item.unitPrice * item.quantity);
+  const unchanged: LineCalculation = {
+    discountedTotal: originalTotal,
+    originalTotal,
+    savings: 0,
+    appliedPromotionName: null,
+  };
 
   if (
     item.unitType === UnitType.Pack ||
     !item.promotions ||
     item.promotions.length === 0
   ) {
-    return {
-      discountedTotal: originalTotal,
-      originalTotal,
-      savings: 0,
-      appliedPromotionName: null,
-    };
+    return unchanged;
   }
 
   const promo = item.promotions.find((entry) => isPromoActive(entry));
   if (!promo || !promo.tiers || promo.tiers.length === 0) {
-    return {
-      discountedTotal: originalTotal,
-      originalTotal,
-      savings: 0,
-      appliedPromotionName: null,
-    };
+    return unchanged;
   }
 
   const strategyType = resolvePromoType(promo);
@@ -126,12 +137,7 @@ export function calculateLineTotal(
     const minQty = discountTier?.quantity || 1;
 
     if (item.quantity < minQty) {
-      return {
-        discountedTotal: originalTotal,
-        originalTotal,
-        savings: 0,
-        appliedPromotionName: null,
-      };
+      return unchanged;
     }
 
     const targetUnitPrice = discountTier ? discountTier.price : item.unitPrice;
@@ -146,116 +152,74 @@ export function calculateLineTotal(
     };
   }
 
-  // --- BUNDLE STRATEGY ---
+  // --- BUNDLE STRATEGY (exact to the centavo, mirrors the backend) ---
   if (
     strategyType === "bundle" &&
     (promo.tieUpProductId || promo.mainProductId)
   ) {
-    const sortedTiers = [...promo.tiers].sort(
+    const bundleTier = [...promo.tiers].sort(
       (a, b) => a.quantity - b.quantity,
-    );
-    const bundleTier = sortedTiers[0];
-    if (!bundleTier) {
-      return {
-        discountedTotal: originalTotal,
-        originalTotal,
-        savings: 0,
-        appliedPromotionName: null,
-      };
-    }
+    )[0];
+    if (!bundleTier) return unchanged;
 
     const mainProductId = promo.mainProductId;
     const tieUpProductId = promo.tieUpProductId;
 
     const isMainProduct = item.productId === mainProductId;
     const isTieUpProduct = item.productId === tieUpProductId;
-
-    if (!isMainProduct && !isTieUpProduct) {
-      return {
-        discountedTotal: originalTotal,
-        originalTotal,
-        savings: 0,
-        appliedPromotionName: null,
-      };
-    }
+    if (!isMainProduct && !isTieUpProduct) return unchanged;
 
     const mainRequiredQty = bundleTier.quantity > 0 ? bundleTier.quantity : 1;
     const tieUpRequiredQty = promo.tieUpQuantity || 1;
 
-    const mainItem = isMainProduct
-      ? item
-      : fullBasket.find((entry) => entry.productId === mainProductId);
-
-    const tieUpItem = isTieUpProduct
-      ? item
-      : fullBasket.find((entry) => entry.productId === tieUpProductId);
-
-    if (!mainItem || !tieUpItem) {
-      return {
-        discountedTotal: originalTotal,
-        originalTotal,
-        savings: 0,
-        appliedPromotionName: null,
-      };
-    }
-
-    const possibleBundlesByMain = Math.floor(
-      mainItem.quantity / mainRequiredQty,
-    );
-    const possibleBundlesByTieUp = Math.floor(
-      tieUpItem.quantity / tieUpRequiredQty,
-    );
-    const applicableBundleCount = Math.min(
-      possibleBundlesByMain,
-      possibleBundlesByTieUp,
-    );
-
-    if (applicableBundleCount > 0) {
-      const standardMainBundleCost = round2(
-        mainRequiredQty * mainItem.unitPrice,
-      );
-      const standardTieUpBundleCost = round2(
-        tieUpRequiredQty * tieUpItem.unitPrice,
-      );
-      const totalStandardCostForCombo = round2(
-        standardMainBundleCost + standardTieUpBundleCost,
+    // Partner line: paid piece lines only (never a pack line or a free item)
+    const findPartnerLine = (productId?: string | null) =>
+      fullBasket.find(
+        (entry) =>
+          entry.productId === productId &&
+          entry.unitType !== UnitType.Pack &&
+          !entry.isFree,
       );
 
-      if (totalStandardCostForCombo > bundleTier.price) {
-        const totalDiscountPerBundle = round2(
-          totalStandardCostForCombo - bundleTier.price,
-        );
+    const mainItem = isMainProduct ? item : findPartnerLine(mainProductId);
+    const tieUpItem = isTieUpProduct ? item : findPartnerLine(tieUpProductId);
+    if (!mainItem || !tieUpItem) return unchanged;
 
-        // Proportional discount allocation for current item line
-        const currentItemSetCost = isMainProduct
-          ? standardMainBundleCost
-          : standardTieUpBundleCost;
-        const discountShareRatio =
-          currentItemSetCost / totalStandardCostForCombo;
-        const currentItemDiscountPerBundle =
-          totalDiscountPerBundle * discountShareRatio;
+    const bundles = Math.min(
+      Math.floor(mainItem.quantity / mainRequiredQty),
+      Math.floor(tieUpItem.quantity / tieUpRequiredQty),
+    );
+    if (bundles <= 0) return unchanged;
 
-        const totalLineSavings = round2(
-          currentItemDiscountPerBundle * applicableBundleCount,
-        );
-        const discountedTotal = round2(
-          Math.max(0, originalTotal - totalLineSavings),
-        );
+    const mainSetC = mainRequiredQty * toCents(mainItem.unitPrice);
+    const tieUpSetC = tieUpRequiredQty * toCents(tieUpItem.unitPrice);
+    const standardC = mainSetC + tieUpSetC;
+    const bundlePriceC = toCents(bundleTier.price);
+    if (standardC <= 0 || standardC <= bundlePriceC) return unchanged;
 
-        return {
-          discountedTotal,
-          originalTotal,
-          savings: totalLineSavings,
-          appliedPromotionName: promo.name,
-        };
-      }
-    }
+    // The bundle sets cost exactly (bundles x configured price). The main line takes its
+    // proportional share rounded to the centavo; the tie-up line takes the remainder.
+    const totalChargeC = bundles * bundlePriceC;
+    const mainChargeC = Math.floor(
+      (2 * totalChargeC * mainSetC + standardC) / (2 * standardC),
+    );
+    const tieUpChargeC = totalChargeC - mainChargeC;
+
+    const lineOriginalC = toCents(item.unitPrice) * item.quantity;
+    const setCostC = bundles * (isMainProduct ? mainSetC : tieUpSetC);
+    const chargeC = isMainProduct ? mainChargeC : tieUpChargeC;
+
+    const discountedC = Math.min(
+      lineOriginalC,
+      Math.max(0, lineOriginalC - setCostC + chargeC),
+    );
+    const savingsC = lineOriginalC - discountedC;
 
     return {
-      discountedTotal: originalTotal,
-      originalTotal,
-      savings: 0,
-      appliedPromotionName: null,
+      discountedTotal: discountedC / 100,
+      originalTotal: lineOriginalC / 100,
+      savings: savingsC / 100,
+      appliedPromotionName: savingsC > 0 ? promo.name : null,
     };
   }
 
@@ -269,7 +233,7 @@ export function calculateLineTotal(
     );
 
     for (const tier of sortedTiers) {
-      if (remainingQuantity >= tier.quantity) {
+      if (tier.quantity > 0 && remainingQuantity >= tier.quantity) {
         const numberOfPacks = Math.floor(remainingQuantity / tier.quantity);
         total += numberOfPacks * tier.price;
         remainingQuantity %= tier.quantity;
@@ -288,10 +252,5 @@ export function calculateLineTotal(
     };
   }
 
-  return {
-    discountedTotal: originalTotal,
-    originalTotal,
-    savings: 0,
-    appliedPromotionName: null,
-  };
+  return unchanged;
 }

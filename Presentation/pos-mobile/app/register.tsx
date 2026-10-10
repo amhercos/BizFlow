@@ -5,6 +5,8 @@ import {
   Briefcase,
   Check,
   ChevronLeft,
+  Eye,
+  EyeOff,
   Lock,
   LucideIcon,
   Mail,
@@ -17,6 +19,7 @@ import {
   ActivityIndicator,
   Alert,
   KeyboardAvoidingView,
+  KeyboardTypeOptions,
   Modal,
   Platform,
   ScrollView,
@@ -27,47 +30,175 @@ import {
 } from "react-native";
 import Animated, { LinearTransition } from "react-native-reanimated";
 
+type FieldKey = keyof RegisterRequest;
+type FieldErrors = Partial<Record<FieldKey, string>>;
+
+const FIELD_KEYS: FieldKey[] = [
+  "fullName",
+  "email",
+  "password",
+  "businessName",
+  "location",
+];
+
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+
+function validate(form: RegisterRequest): FieldErrors {
+  const errors: FieldErrors = {};
+  if (form.fullName.trim().length < 2) {
+    errors.fullName = "Enter your full name (at least 2 characters).";
+  }
+  if (!EMAIL_PATTERN.test(form.email.trim())) {
+    errors.email = "Enter a valid email, like name@example.com.";
+  }
+  if (form.password.length < 6) {
+    errors.password = "Password must be at least 6 characters.";
+  }
+  if (form.businessName.trim().length < 2) {
+    errors.businessName = "Enter your business name (at least 2 characters).";
+  }
+  if (form.location.trim().length < 2) {
+    errors.location = "Enter your store's city or address.";
+  }
+  return errors;
+}
+
+interface ServerProblem {
+  message: string;
+  field?: FieldKey;
+}
+
+/** Turns whatever the API/network threw into a readable message and the field it belongs to. */
+function parseServerProblem(error: unknown): ServerProblem {
+  const err = error as {
+    message?: string;
+    response?: {
+      status?: number;
+      data?: { message?: string; title?: string; field?: string };
+    };
+  };
+  const status = err?.response?.status;
+  const data = err?.response?.data;
+
+  if (status && status >= 500) {
+    return {
+      message:
+        "Our server had a problem creating your account (error " +
+        status +
+        "). Please try again in a moment.",
+    };
+  }
+  if (!err?.response && err?.message?.toLowerCase().includes("network")) {
+    return {
+      message: "Can't reach the server. Check your internet connection and try again.",
+    };
+  }
+
+  let message =
+    (typeof data?.message === "string" && data.message) ||
+    (typeof data?.title === "string" && data.title) ||
+    (error instanceof Error ? error.message : "") ||
+    "Registration failed. Please check your details and try again.";
+
+  if (/^request failed with status code/i.test(message)) {
+    message = "Registration failed. Please check your details and try again.";
+  }
+
+  let field: FieldKey | undefined = FIELD_KEYS.find((key) => key === data?.field);
+  if (!field) {
+    const lower = message.toLowerCase();
+    if (lower.includes("email")) field = "email";
+    else if (lower.includes("password")) field = "password";
+    else if (lower.includes("business")) field = "businessName";
+  }
+  return { message, field };
+}
+
 interface RegisterInputProps {
   readonly icon: LucideIcon;
+  readonly label: string;
   readonly placeholder: string;
+  readonly hint: string;
   readonly value: string;
   readonly onChange: (text: string) => void;
+  readonly onBlur?: () => void;
+  readonly error?: string;
   readonly secure?: boolean;
+  readonly keyboardType?: KeyboardTypeOptions;
+  readonly autoCapitalize?: "none" | "sentences" | "words" | "characters";
 }
 
 const RegisterInput = ({
   icon: Icon,
+  label,
   placeholder,
+  hint,
   value,
   onChange,
+  onBlur,
+  error,
   secure = false,
+  keyboardType = "default",
+  autoCapitalize = "none",
 }: RegisterInputProps): ReactElement => {
   const [isFocused, setIsFocused] = useState<boolean>(false);
+  const [revealed, setRevealed] = useState<boolean>(false);
+
+  const borderClass = error
+    ? "border-red-500 bg-red-50"
+    : isFocused
+      ? "border-blue-600 bg-white"
+      : "border-transparent bg-slate-50";
 
   return (
     <View className="mb-4">
+      <Text className="text-slate-700 text-sm font-bold mb-1.5 ml-2">
+        {label}
+      </Text>
       <View
-        className={`flex-row items-center h-18 px-6 rounded-3xl border-2 bg-slate-50 ${
-          isFocused ? "border-blue-600 bg-white" : "border-transparent"
-        }`}
+        className={`flex-row items-center h-18 px-6 rounded-3xl border-2 ${borderClass}`}
       >
         <Icon
           size={22}
-          color={isFocused ? "#2563eb" : "#94a3b8"}
+          color={error ? "#dc2626" : isFocused ? "#2563eb" : "#94a3b8"}
           strokeWidth={2.5}
         />
         <TextInput
           className="flex-1 ml-4 text-slate-900 text-lg font-bold"
           placeholder={placeholder}
           placeholderTextColor="#94a3b8"
-          secureTextEntry={secure}
+          secureTextEntry={secure && !revealed}
+          keyboardType={keyboardType}
+          autoCapitalize={autoCapitalize}
+          autoCorrect={false}
           value={value}
           onChangeText={onChange}
-          autoCapitalize="none"
           onFocus={() => setIsFocused(true)}
-          onBlur={() => setIsFocused(false)}
+          onBlur={() => {
+            setIsFocused(false);
+            onBlur?.();
+          }}
         />
+        {secure ? (
+          <TouchableOpacity
+            onPress={() => setRevealed((prev) => !prev)}
+            hitSlop={10}
+          >
+            {revealed ? (
+              <EyeOff size={20} color="#94a3b8" />
+            ) : (
+              <Eye size={20} color="#94a3b8" />
+            )}
+          </TouchableOpacity>
+        ) : null}
       </View>
+      {error ? (
+        <Text className="text-red-600 text-sm font-semibold mt-1.5 ml-2">
+          {error}
+        </Text>
+      ) : (
+        <Text className="text-slate-500 text-xs mt-1.5 ml-2">{hint}</Text>
+      )}
     </View>
   );
 };
@@ -76,6 +207,8 @@ export default function RegisterScreen(): ReactElement {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [acceptedTerms, setAcceptedTerms] = useState<boolean>(false);
   const [termsModalVisible, setTermsModalVisible] = useState<boolean>(false);
+  const [errors, setErrors] = useState<FieldErrors>({});
+  const [formError, setFormError] = useState<string>("");
 
   const [formData, setFormData] = useState<RegisterRequest>({
     email: "",
@@ -86,11 +219,18 @@ export default function RegisterScreen(): ReactElement {
   });
 
   const handleInputChange = useCallback(
-    (key: keyof RegisterRequest, value: string): void => {
+    (key: FieldKey, value: string): void => {
       setFormData((prev) => ({ ...prev, [key]: value }));
+      setErrors((prev) => (prev[key] ? { ...prev, [key]: undefined } : prev));
+      setFormError("");
     },
     [],
   );
+
+  const handleFieldBlur = (key: FieldKey): void => {
+    if (!formData[key]) return;
+    setErrors((prev) => ({ ...prev, [key]: validate(formData)[key] }));
+  };
 
   const handleBack = useCallback(() => {
     if (router.canGoBack()) {
@@ -102,24 +242,39 @@ export default function RegisterScreen(): ReactElement {
 
   const handleRegister = async (): Promise<void> => {
     if (!acceptedTerms) {
-      Alert.alert("Terms & Conditions", "Please accept the Terms and Conditions to proceed.");
+      Alert.alert(
+        "Terms & Conditions",
+        "Please accept the Terms and Conditions to proceed.",
+      );
       return;
     }
 
-    if (Object.values(formData).some((val) => !val.trim())) {
-      Alert.alert("Incomplete", "Please provide all merchant profile details.");
+    const found = validate(formData);
+    setErrors(found);
+    if (Object.keys(found).length > 0) {
+      setFormError("Please fix the highlighted fields.");
       return;
     }
+
+    setFormError("");
     setIsLoading(true);
     try {
-      await authService.register(formData);
+      await authService.register({
+        ...formData,
+        email: formData.email.trim(),
+        fullName: formData.fullName.trim(),
+        businessName: formData.businessName.trim(),
+        location: formData.location.trim(),
+      });
       Alert.alert("Success", "Merchant account established.", [
         { text: "Login", onPress: () => router.replace("/") },
       ]);
     } catch (error: unknown) {
-      const message =
-        error instanceof Error ? error.message : "Registration failed.";
-      Alert.alert("Error", message);
+      const problem = parseServerProblem(error);
+      setFormError(problem.message);
+      if (problem.field) {
+        setErrors((prev) => ({ ...prev, [problem.field as FieldKey]: problem.message }));
+      }
     } finally {
       setIsLoading(false);
     }
@@ -148,7 +303,7 @@ export default function RegisterScreen(): ReactElement {
               <ChevronLeft size={28} color="#0f172a" strokeWidth={3} />
             </TouchableOpacity>
 
-            <View className="mb-10">
+            <View className="mb-8">
               <Text className="text-6xl font-black text-slate-950 tracking-tighter">
                 Join.
               </Text>
@@ -157,36 +312,68 @@ export default function RegisterScreen(): ReactElement {
               </Text>
             </View>
 
+            {formError ? (
+              <View className="bg-red-50 border border-red-200 rounded-2xl p-4 mb-5">
+                <Text className="text-red-700 text-sm font-semibold">
+                  {formError}
+                </Text>
+              </View>
+            ) : null}
+
             <View>
               <RegisterInput
                 icon={User}
-                placeholder="Enter Full Name"
+                label="Full name"
+                placeholder="e.g. Juan Dela Cruz"
+                hint="Your name as the store owner."
+                autoCapitalize="words"
                 value={formData.fullName}
+                error={errors.fullName}
+                onBlur={() => handleFieldBlur("fullName")}
                 onChange={(t) => handleInputChange("fullName", t)}
               />
               <RegisterInput
                 icon={Mail}
-                placeholder="Account Email Address"
+                label="Email"
+                placeholder="name@example.com"
+                hint="You will log in with this email. It must not be registered yet."
+                keyboardType="email-address"
                 value={formData.email}
+                error={errors.email}
+                onBlur={() => handleFieldBlur("email")}
                 onChange={(t) => handleInputChange("email", t)}
               />
               <RegisterInput
                 icon={Lock}
-                placeholder="Secure Password"
+                label="Password"
+                placeholder="Create a password"
+                hint="At least 6 characters. Mixing upper and lower case letters, a number and a symbol is safest."
                 secure
                 value={formData.password}
+                error={errors.password}
+                onBlur={() => handleFieldBlur("password")}
                 onChange={(t) => handleInputChange("password", t)}
               />
               <RegisterInput
                 icon={Briefcase}
-                placeholder="Registered Business Name"
+                label="Business name"
+                placeholder="e.g. Aling Nena's Store"
+                hint="Must be unique. This becomes your store's name."
+                autoCapitalize="words"
                 value={formData.businessName}
+                error={errors.businessName}
+                onBlur={() => handleFieldBlur("businessName")}
                 onChange={(t) => handleInputChange("businessName", t)}
               />
               <RegisterInput
                 icon={MapPin}
-                placeholder="Primary Store Location"
+                label="Store location"
+                placeholder="e.g. Taguig City"
+                hint="City or street address of your main store."
+                autoCapitalize="words"
                 value={formData.location}
+                error={errors.location}
+                onBlur={() => handleFieldBlur("location")}
                 onChange={(t) => handleInputChange("location", t)}
               />
             </View>
@@ -197,13 +384,19 @@ export default function RegisterScreen(): ReactElement {
                 onPress={() => setAcceptedTerms((prev) => !prev)}
                 activeOpacity={0.8}
                 className={`w-6 h-6 rounded-lg border-2 items-center justify-center mr-3 ${
-                  acceptedTerms ? "bg-blue-600 border-blue-600" : "border-slate-300 bg-white"
+                  acceptedTerms
+                    ? "bg-blue-600 border-blue-600"
+                    : "border-slate-300 bg-white"
                 }`}
               >
-                {acceptedTerms && <Check size={16} color="white" strokeWidth={3} />}
+                {acceptedTerms && (
+                  <Check size={16} color="white" strokeWidth={3} />
+                )}
               </TouchableOpacity>
               <View className="flex-1 flex-row flex-wrap items-center">
-                <Text className="text-slate-600 text-base font-medium">I agree to the </Text>
+                <Text className="text-slate-600 text-base font-medium">
+                  I agree to the{" "}
+                </Text>
                 <TouchableOpacity onPress={() => setTermsModalVisible(true)}>
                   <Text className="text-blue-600 text-base font-bold underline">
                     Terms and Conditions
@@ -219,7 +412,9 @@ export default function RegisterScreen(): ReactElement {
               disabled={isLoading || !acceptedTerms}
               activeOpacity={0.85}
               className={`h-16 rounded-[24px] justify-center items-center mt-4 shadow-2xl ${
-                isLoading || !acceptedTerms ? "bg-slate-300 opacity-60" : "bg-slate-950 shadow-blue-200"
+                isLoading || !acceptedTerms
+                  ? "bg-slate-300 opacity-60"
+                  : "bg-slate-950 shadow-blue-200"
               }`}
             >
               {isLoading ? (
@@ -277,7 +472,9 @@ export default function RegisterScreen(): ReactElement {
               }}
               className="bg-blue-600 h-14 rounded-2xl items-center justify-center mt-2"
             >
-              <Text className="text-white font-bold text-base">Accept & Close</Text>
+              <Text className="text-white font-bold text-base">
+                Accept & Close
+              </Text>
             </TouchableOpacity>
           </View>
         </View>

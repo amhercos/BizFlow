@@ -20,6 +20,34 @@ import {
   withLivePromotions,
 } from "../utils/promotion-engine";
 
+/** A basket line is identified by product + unit + whether it is a free item. */
+function sameLine(
+  item: BasketItem,
+  productId: string,
+  unitType: UnitType,
+  isFree: boolean,
+): boolean {
+  return (
+    item.productId === productId &&
+    item.unitType === unitType &&
+    !!item.isFree === isFree
+  );
+}
+
+/** Pieces of a product already in the basket (paid + free, pieces + packs), optionally skipping one line. */
+function piecesUsed(
+  items: BasketItem[],
+  productId: string,
+  skip?: BasketItem,
+): number {
+  return items.reduce((sum, item) => {
+    if (item.productId !== productId || item === skip) return sum;
+    const multiplier =
+      item.unitType === UnitType.Pack ? Math.max(item.piecesPerPack, 1) : 1;
+    return sum + item.quantity * multiplier;
+  }, 0);
+}
+
 export function useSale() {
   const [basket, setBasket] = useState<BasketItem[]>([]);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
@@ -33,12 +61,22 @@ export function useSale() {
   const totals = useMemo(() => {
     let originalTotalAmount = 0;
     let cashDiscountedAmount = 0;
+    let creditTotalAmount = 0;
+    let freebieCount = 0;
+    let freebieValue = 0;
     const promoSavings = new Map<string, number>();
 
     pricedBasket.forEach((item) => {
+      if (item.isFree) {
+        freebieCount += item.quantity;
+        freebieValue += item.unitPrice * item.quantity;
+        return;
+      }
+
       const lineCalculations = calculateLineTotal(item, pricedBasket);
       originalTotalAmount += lineCalculations.originalTotal;
       cashDiscountedAmount += lineCalculations.discountedTotal;
+      creditTotalAmount += item.unitPrice * item.quantity;
 
       if (lineCalculations.appliedPromotionName && lineCalculations.savings > 0) {
         const key = lineCalculations.appliedPromotionName;
@@ -48,11 +86,6 @@ export function useSale() {
         );
       }
     });
-
-    const creditTotalAmount = pricedBasket.reduce(
-      (acc, item) => acc + item.unitPrice * item.quantity,
-      0,
-    );
 
     return {
       originalTotal: roundTo(originalTotalAmount, 2),
@@ -66,47 +99,50 @@ export function useSale() {
         name,
         savings: roundTo(savings, 2),
       })),
+      freebieCount,
+      freebieValue: roundTo(freebieValue, 2),
     };
   }, [pricedBasket]);
 
   const addToBasket = useCallback(
-    (product: Product, unitType: UnitType = UnitType.Piece): void => {
+    (
+      product: Product,
+      unitType: UnitType = UnitType.Piece,
+      quantity: number = 1,
+    ): void => {
+      const addQty = Math.max(1, Math.floor(quantity));
+
       setBasket((prev) => {
-        const existingIndex = prev.findIndex(
-          (item) => item.productId === product.id && item.unitType === unitType,
+        const existingIndex = prev.findIndex((item) =>
+          sameLine(item, product.id, unitType, false),
         );
+        const existing = existingIndex > -1 ? prev[existingIndex] : undefined;
 
         const isPack = unitType === UnitType.Pack;
         const selectedUnitPrice = isPack ? product.packPrice : product.price;
         const multiplier =
           isPack && product.piecesPerPack > 0 ? product.piecesPerPack : 1;
-        const requiredStock = 1 * multiplier;
 
-        if (existingIndex > -1) {
-          const existingItem = prev[existingIndex];
-          const nextQty = existingItem.quantity + 1;
-          const totalRequiredStock = nextQty * multiplier;
+        const nextQty = (existing?.quantity ?? 0) + addQty;
+        const requiredPieces =
+          piecesUsed(prev, product.id, existing) + nextQty * multiplier;
 
-          if (totalRequiredStock > product.stock) {
-            Alert.alert(
-              "Stock Limit",
-              `Only ${product.stock} base units available.`,
-            );
-            return prev;
-          }
+        if (requiredPieces > product.stock) {
+          Alert.alert(
+            "Stock Limit",
+            `Only ${product.stock} base units available.`,
+          );
+          return prev;
+        }
 
+        if (existing) {
           const updated = [...prev];
           updated[existingIndex] = {
-            ...existingItem,
+            ...existing,
             quantity: nextQty,
             unitPrice: selectedUnitPrice,
           };
           return updated;
-        }
-
-        if (requiredStock > product.stock) {
-          Alert.alert("Stock Limit", `Not enough stock for a full pack.`);
-          return prev;
         }
 
         return [
@@ -114,13 +150,14 @@ export function useSale() {
           {
             productId: product.id,
             name: `${product.name} (${unitType})`,
-            quantity: 1,
+            quantity: addQty,
             unitPrice: selectedUnitPrice,
             stock: product.stock,
             unitType: unitType,
             piecesPerPack: product.piecesPerPack || 1,
             packPrice: product.packPrice || 0,
             retailPrice: product.price,
+            isFree: false,
             promotions: (product.promotions ?? []).map(toAppliedPromotion),
           },
         ];
@@ -130,34 +167,72 @@ export function useSale() {
   );
 
   const removeItem = useCallback(
-    (productId: string, unitType: UnitType): void => {
+    (productId: string, unitType: UnitType, isFree: boolean = false): void => {
       setBasket((prev) =>
-        prev.filter(
-          (item) =>
-            !(item.productId === productId && item.unitType === unitType),
-        ),
+        prev.filter((item) => !sameLine(item, productId, unitType, isFree)),
       );
     },
     [],
   );
 
   const updateQuantity = useCallback(
-    (productId: string, unitType: UnitType, nextQty: number): void => {
-      setBasket((prev) =>
-        prev.map((item) => {
-          if (item.productId !== productId || item.unitType !== unitType)
-            return item;
+    (
+      productId: string,
+      unitType: UnitType,
+      nextQty: number,
+      isFree: boolean = false,
+    ): void => {
+      setBasket((prev) => {
+        const target = prev.find((item) =>
+          sameLine(item, productId, unitType, isFree),
+        );
+        if (!target || nextQty <= 0) return prev;
 
-          const multiplier =
-            item.unitType === UnitType.Pack ? item.piecesPerPack : 1;
-          if (nextQty * multiplier > item.stock) {
-            Alert.alert("Stock Limit", `Cannot exceed available stock limit.`);
-            return item;
-          }
-          if (nextQty <= 0) return item;
-          return { ...item, quantity: nextQty };
-        }),
-      );
+        const multiplier =
+          unitType === UnitType.Pack ? Math.max(target.piecesPerPack, 1) : 1;
+        if (
+          piecesUsed(prev, productId, target) + nextQty * multiplier >
+          target.stock
+        ) {
+          Alert.alert("Stock Limit", `Cannot exceed available stock limit.`);
+          return prev;
+        }
+
+        return prev.map((item) =>
+          item === target ? { ...item, quantity: nextQty } : item,
+        );
+      });
+    },
+    [],
+  );
+
+  /** Mark a line as a freebie (or undo it). Merges with the matching line if one exists. */
+  const toggleFree = useCallback(
+    (productId: string, unitType: UnitType, currentlyFree: boolean): void => {
+      setBasket((prev) => {
+        const source = prev.find((item) =>
+          sameLine(item, productId, unitType, currentlyFree),
+        );
+        if (!source) return prev;
+
+        const target = prev.find((item) =>
+          sameLine(item, productId, unitType, !currentlyFree),
+        );
+
+        if (target) {
+          return prev
+            .filter((item) => item !== source)
+            .map((item) =>
+              item === target
+                ? { ...item, quantity: item.quantity + source.quantity }
+                : item,
+            );
+        }
+
+        return prev.map((item) =>
+          item === source ? { ...item, isFree: !currentlyFree } : item,
+        );
+      });
     },
     [],
   );
@@ -186,6 +261,17 @@ export function useSale() {
         items: pricedBasket.map((item) => {
           const isPack = item.unitType === UnitType.Pack;
 
+          if (item.isFree) {
+            return {
+              productId: item.productId,
+              quantity: item.quantity,
+              isPack,
+              unitPrice: 0,
+              subTotal: 0,
+              isFree: true,
+            };
+          }
+
           if (isCredit) {
             const subTotal = roundTo(item.unitPrice * item.quantity, 2);
             return {
@@ -194,6 +280,7 @@ export function useSale() {
               isPack,
               unitPrice: item.unitPrice,
               subTotal,
+              isFree: false,
             };
           }
 
@@ -204,6 +291,7 @@ export function useSale() {
             isPack,
             unitPrice: roundTo(discountedTotal / item.quantity, 2),
             subTotal: roundTo(discountedTotal, 2),
+            isFree: false,
           };
         }),
         paymentType: params.paymentType,
@@ -238,6 +326,7 @@ export function useSale() {
     addToBasket,
     removeItem,
     updateQuantity,
+    toggleFree,
     clearBasket,
     checkout,
     isSubmitting,

@@ -9,7 +9,10 @@ import { useSale } from "@/src/hooks/use-sale";
 import { formatPHP } from "@/src/lib/math";
 import { typeface, useInter } from "@/src/theme/typography";
 import { PaymentType, UnitType, type Product } from "@/src/types/sale";
-import { toAppliedPromotion } from "@/src/utils/promotion-engine";
+import { resolvePromoType, toAppliedPromotion } from "@/src/utils/promotion-engine";
+import { PromoBar } from "@/components/sales/PromoBar";
+import { usePromotions } from "@/src/hooks/use-promotions";
+import type { Promotion } from "@/src/types/promotion";
 import * as Haptics from "expo-haptics";
 import { useFocusEffect } from "expo-router";
 import {
@@ -21,6 +24,7 @@ import {
 } from "lucide-react-native";
 import React, { useCallback, useMemo, useState } from "react";
 import {
+  Alert,
   FlatList,
   LayoutChangeEvent,
   Pressable,
@@ -52,6 +56,7 @@ export default function NewSalePage() {
 
   const { products = [], refresh } = useInventory();
   const { credits, fetchCredits } = useCredits();
+  const { promotions: promoCatalog } = usePromotions();
 
   const {
     basket,
@@ -60,6 +65,7 @@ export default function NewSalePage() {
     removeItem,
     updateQuantity,
     clearBasket,
+    toggleFree,
     checkout,
     isSubmitting,
   } = useSale();
@@ -123,6 +129,48 @@ export default function NewSalePage() {
     setSelectedProductForUnit(null);
   };
 
+  const handlePromoPress = (promo: Promotion) => {
+    const tier = [...(promo.tiers ?? [])].sort(
+      (a, b) => a.quantity - b.quantity,
+    )[0];
+    if (!tier) return;
+
+    const findProduct = (id?: string | null) =>
+      id ? products.find((p: any) => p.id === id) : undefined;
+
+    const main = findProduct(promo.mainProductId);
+    if (!main) {
+      Alert.alert(
+        "Promo unavailable",
+        "The product for this promo could not be found.",
+      );
+      return;
+    }
+
+    addToBasket(
+      normalizeProduct(main),
+      UnitType.Piece,
+      Math.max(tier.quantity || 1, 1),
+    );
+
+    if (resolvePromoType(promo) === "bundle") {
+      const tieUp = findProduct(promo.tieUpProductId);
+      if (!tieUp) {
+        Alert.alert(
+          "Promo incomplete",
+          "The tie-up product for this promo could not be found.",
+        );
+        return;
+      }
+      addToBasket(
+        normalizeProduct(tieUp),
+        UnitType.Piece,
+        Math.max(promo.tieUpQuantity || 1, 1),
+      );
+    }
+
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+  };
   const handleCheckout = async () => {
     const success = await checkout({
       paymentType: activePayment,
@@ -200,10 +248,9 @@ export default function NewSalePage() {
     setCashReceived,
     isSubmitting,
     handleCheckout,
-    updateQuantity: (productId: string, unit: UnitType, nextQty: number) =>
-      updateQuantity(productId, unit, nextQty),
-    removeItem: (productId: string, unit: UnitType) =>
-      removeItem(productId, unit),
+    updateQuantity,
+    removeItem,
+    toggleFree,
     clearBasket,
     credits: credits || [],
     selectedCreditId,
@@ -292,6 +339,7 @@ export default function NewSalePage() {
             </ScrollView>
           </View>
 
+          <PromoBar promotions={promoCatalog ?? []} onPress={handlePromoPress} />
           {filterOpen ? (
             <View style={styles.filterPanel}>
               <View style={styles.filterSearch}>

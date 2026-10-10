@@ -27,6 +27,7 @@ interface TransactionModalProps {
     nextQty: number,
   ) => void;
   removeItem: (productId: string, unitType: UnitType) => void;
+  toggleFree: (productId: string, unitType: UnitType, isFree: boolean) => void;
   clearBasket: () => void;
   credits: CustomerCredit[];
   selectedCreditId: string;
@@ -43,6 +44,8 @@ interface TransactionModalProps {
     creditTotal: number;
     savings: number;
     promotionsApplied: AppliedPromoLine[];
+    freebieCount: number;
+    freebieValue: number;
   };
 }
 

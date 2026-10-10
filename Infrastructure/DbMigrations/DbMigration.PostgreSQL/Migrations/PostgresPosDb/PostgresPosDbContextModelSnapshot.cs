@@ -419,6 +419,13 @@ namespace DbMigration.PostgreSQL.Migrations.PostgresPosDb
                         .HasColumnType("integer")
                         .HasDefaultValue(1);
 
+                    b.Property<bool>("IsFree")
+                        .HasColumnType("boolean");
+
+                    b.Property<decimal>("LineTotal")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
                     b.Property<Guid>("ProductId")
                         .HasColumnType("uuid");
 
