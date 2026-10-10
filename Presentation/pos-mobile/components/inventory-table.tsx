@@ -53,6 +53,7 @@ const RightActions = ({ drag, onEdit, onDelete }: RightActionsProps) => {
 };
 
 interface InventoryTableProps {
+  onRefresh?: () => void;
   products: Product[];
   onDelete: (product: Product) => void;
   onEdit: (product: Product) => void;
@@ -65,7 +66,7 @@ function isExpired(product: Product) {
 
 function stockTone(product: Product) {
   if (product.stockQuantity === 0) return "#E11D48";
-  if (product.stockQuantity <= product.lowStockThreshold) return "#D97706";
+  if (product.stockQuantity <= (product.lowStockThreshold ?? 5)) return "#D97706";
   return "#15803D";
 }
 

@@ -1,4 +1,4 @@
-import { typeface, useInter } from "@/src/theme/typography";
+﻿import { typeface, useInter } from "@/src/theme/typography";
 import React, { useEffect, useMemo, useState } from "react";
 import { Modal, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import ScrollPicker from "react-native-wheel-scrollview-picker";
@@ -23,7 +23,7 @@ const MONTHS = [
 
 interface DateWheelSheetProps {
   visible: boolean;
-  value: Date;
+  value?: Date | null;
   onCancel: () => void;
   onConfirm: (date: Date) => void;
 }
@@ -35,10 +35,13 @@ export function DateWheelSheet({
   onConfirm,
 }: DateWheelSheetProps) {
   const font = useInter();
-  const [tempDate, setTempDate] = useState(value);
+  const safeValue = value instanceof Date && !isNaN(value.getTime()) ? value : new Date();
+  const [tempDate, setTempDate] = useState(safeValue);
 
   useEffect(() => {
-    if (visible) setTempDate(value);
+    if (visible) {
+      setTempDate(value instanceof Date && !isNaN(value.getTime()) ? value : new Date());
+    }
   }, [visible, value]);
 
   const year = tempDate.getFullYear();

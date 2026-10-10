@@ -66,7 +66,7 @@ function isExpired(product: Product) {
 
 function stockTone(product: Product) {
   if (product.stockQuantity === 0) return "#E11D48";
-  if (product.stockQuantity <= product.lowStockThreshold) return "#D97706";
+  if (product.stockQuantity <= (product.lowStockThreshold ?? 5)) return "#D97706";
   return "#15803D";
 }
 
@@ -91,7 +91,7 @@ function packCopy(product: Product) {
     product.piecesPerPack != null &&
     product.piecesPerPack > 1
   ) {
-    return `${formatPHP(product.packPrice)} · ${product.piecesPerPack} pcs`;
+    return `${formatPHP(product.packPrice)} Â· ${product.piecesPerPack} pcs`;
   }
   return "None";
 }
@@ -99,7 +99,7 @@ function packCopy(product: Product) {
 function statusCopy(product: Product) {
   if (product.stockQuantity === 0) return "Out";
   if (isExpired(product)) return "Expired";
-  if (product.stockQuantity <= product.lowStockThreshold) return "Low";
+  if (product.stockQuantity <= (product.lowStockThreshold ?? 5)) return "Low";
   return null;
 }
 
@@ -161,7 +161,7 @@ export default function InventoryScreen(): ReactElement {
     let expired = 0;
     for (const product of products) {
       if (product.stockQuantity === 0) out += 1;
-      else if (product.stockQuantity <= product.lowStockThreshold) low += 1;
+      else if (product.stockQuantity <= (product.lowStockThreshold ?? 5)) low += 1;
       if (product.expiryDate && new Date(product.expiryDate) < today) {
         expired += 1;
       }
@@ -183,7 +183,7 @@ export default function InventoryScreen(): ReactElement {
         case "all":
           return true;
         case "low-stock":
-          return p.stockQuantity <= p.lowStockThreshold && p.stockQuantity > 0;
+          return p.stockQuantity <= (p.lowStockThreshold ?? 5) && p.stockQuantity > 0;
         case "out-of-stock":
           return p.stockQuantity === 0;
         case "expired":
@@ -268,7 +268,7 @@ export default function InventoryScreen(): ReactElement {
         ).map((item) => {
           const active = activeFilter === item.id;
           const display =
-            loading && products.length === 0 ? "—" : String(item.value);
+            loading && products.length === 0 ? "â€”" : String(item.value);
           const hot = item.value > 0;
           return (
             <Pressable
@@ -385,6 +385,7 @@ export default function InventoryScreen(): ReactElement {
           products={filteredProducts}
           onDelete={handleDeletePress}
           onEdit={handleEditPress}
+          onRefresh={refresh}
           font={font}
         />
       ) : null}

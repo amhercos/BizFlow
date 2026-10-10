@@ -1,7 +1,7 @@
+import type { ProductFormState } from "@/src/types/inventory";
 import { DateWheelSheet } from "@/components/inventory/DateWheelSheet";
 import {
   ProductFormFields,
-  type ProductFormState,
 } from "@/components/inventory/product-form-fields";
 import { typeface, useInter } from "@/src/theme/typography";
 import type { Category, CreateProductRequest } from "@/src/types/inventory";
@@ -56,9 +56,8 @@ export function AddProductModal({
 }: AddProductModalProps) {
   const insets = useSafeAreaInsets();
   const font = useInter();
-  const [loading, setLoading] = useState(false);
-  const [pickerOpen, setPickerOpen] = useState(false);
-  const [tempDate, setTempDate] = useState(new Date());
+  const [loading, setLoading] = useState<boolean>(false);
+  const [pickerOpen, setPickerOpen] = useState<boolean>(false);
   const [formData, setFormData] = useState<ProductFormState>(EMPTY_FORM);
 
   const isValid = useMemo(
@@ -67,7 +66,7 @@ export function AddProductModal({
       formData.price !== "" &&
       formData.stockQuantity !== "" &&
       isPackConfigValid(formData.packPrice, formData.piecesPerPack),
-    [formData],
+    [formData]
   );
 
   const handleSubmit = async () => {
@@ -75,12 +74,13 @@ export function AddProductModal({
     setLoading(true);
     try {
       await onAdd({
-        ...formData,
+        name: formData.name,
         price: Number(formData.price),
         packPrice: parseOptionalNumber(formData.packPrice),
         piecesPerPack: parseOptionalNumber(formData.piecesPerPack),
         stockQuantity: Number(formData.stockQuantity),
         categoryId: formData.categoryId,
+        description: formData.description,
         expiryDate: formData.expiryDate || null,
       });
       setFormData(EMPTY_FORM);
@@ -129,7 +129,7 @@ export function AddProductModal({
               categories={categories}
               onOpenCategoryManager={onOpenCategoryManager}
               onPickDate={() => setPickerOpen(true)}
-              onClearExpiry={() => setFormData({ ...formData, expiryDate: "" })}
+              onClearExpiry={() => setFormData((prev: ProductFormState) => ({ ...prev, expiryDate: "" }))}
             />
 
             <TouchableOpacity
@@ -141,7 +141,7 @@ export function AddProductModal({
                 <ActivityIndicator color="#FFFFFF" />
               ) : (
                 <Text style={[styles.submitText, typeface(font.semibold, "600")]}>
-                  Create product
+                  Add product
                 </Text>
               )}
             </TouchableOpacity>
@@ -151,14 +151,13 @@ export function AddProductModal({
 
       <DateWheelSheet
         visible={pickerOpen}
-        value={tempDate}
+        value={formData.expiryDate ? new Date(formData.expiryDate) : new Date()}
         onCancel={() => setPickerOpen(false)}
-        onConfirm={(date) => {
-          setTempDate(date);
-          setFormData({
-            ...formData,
-            expiryDate: date.toISOString().split("T")[0],
-          });
+        onConfirm={(date: Date) => {
+          const year = date.getFullYear();
+          const month = String(date.getMonth() + 1).padStart(2, "0");
+          const day = String(date.getDate()).padStart(2, "0");
+          setFormData((prev: ProductFormState) => ({ ...prev, expiryDate: `${year}-${month}-${day}` }));
           setPickerOpen(false);
         }}
       />
@@ -167,61 +166,15 @@ export function AddProductModal({
 }
 
 const styles = StyleSheet.create({
-  backdrop: {
-    flex: 1,
-    justifyContent: "flex-end",
-    backgroundColor: "rgba(15, 23, 42, 0.4)",
-  },
-  sheet: {
-    backgroundColor: "#FAFBFD",
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    maxHeight: "92%",
-  },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 22,
-    paddingTop: 20,
-    paddingBottom: 12,
-  },
-  identity: {
-    flex: 1,
-  },
-  title: {
-    fontSize: 20,
-    color: INK,
-    letterSpacing: -0.4,
-  },
-  subtitle: {
-    marginTop: 3,
-    fontSize: 13,
-    color: MUTED,
-  },
-  close: {
-    width: 36,
-    height: 36,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  body: {
-    paddingHorizontal: 22,
-    paddingBottom: 24,
-    paddingTop: 8,
-  },
-  submit: {
-    marginTop: 24,
-    height: 48,
-    borderRadius: 14,
-    backgroundColor: TINT,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  submitOff: {
-    backgroundColor: "#CBD5E1",
-  },
-  submitText: {
-    color: "#FFFFFF",
-    fontSize: 16,
-  },
+  backdrop: { flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(15, 23, 42, 0.4)" },
+  sheet: { backgroundColor: "#FAFBFD", borderTopLeftRadius: 24, borderTopRightRadius: 24, maxHeight: "92%" },
+  header: { flexDirection: "row", alignItems: "center", paddingHorizontal: 22, paddingTop: 20, paddingBottom: 12 },
+  identity: { flex: 1, marginRight: 12 },
+  title: { fontSize: 20, color: INK, letterSpacing: -0.4 },
+  subtitle: { marginTop: 3, fontSize: 13, color: MUTED },
+  close: { width: 36, height: 36, alignItems: "center", justifyContent: "center" },
+  body: { paddingHorizontal: 22, paddingBottom: 24, paddingTop: 8 },
+  submit: { marginTop: 24, height: 48, borderRadius: 14, backgroundColor: TINT, alignItems: "center", justifyContent: "center" },
+  submitOff: { backgroundColor: "#CBD5E1" },
+  submitText: { color: "#FFFFFF", fontSize: 16 },
 });
