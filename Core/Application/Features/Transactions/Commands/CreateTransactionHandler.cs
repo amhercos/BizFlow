@@ -59,38 +59,31 @@ public class CreateTransactionHandler(
 
                 // --- FEFO BATCH STOCK DEDUCTION ---
                 var activeBatches = await context.ProductBatches
-                    .Where(b => b.ProductId == product.Id && b.StoreId == storeId && b.Quantity > 0 && !b.IsDeleted)
-                    .OrderBy(b => b.ExpiryDate) // Earliest expiry first (FEFO)
+                    .Where(b => b.ProductId == product.Id && b.Quantity > 0 && !b.IsDeleted)
+                    .OrderBy(b => b.ExpiryDate)
                     .ToListAsync(ct);
 
-                var totalAvailableBatchStock = activeBatches.Sum(b => b.Quantity);
-                if (totalAvailableBatchStock < basePiecesDeducted)
+                int totalAvailableBatchStock = activeBatches.Sum(b => b.Quantity);
+                int effectiveAvailableStock = Math.Max(totalAvailableBatchStock, product.Stock);
+
+                if (effectiveAvailableStock < basePiecesDeducted)
                 {
-                    if (product.Stock >= basePiecesDeducted && activeBatches.Count == 0)
-                    {
-                        product.Stock -= basePiecesDeducted;
-                    }
-                    else
-                    {
-                        throw new Exception($"Insufficient stock for: {product.Name}. Required: {basePiecesDeducted} pcs, Available: {Math.Max(totalAvailableBatchStock, product.Stock)} pcs");
-                    }
+                    throw new Exception($"Insufficient stock for: {product.Name}. Required: {basePiecesDeducted} pcs, Available: {effectiveAvailableStock} pcs");
                 }
-                else
+
+                int remainingToDeduct = basePiecesDeducted;
+                foreach (var batch in activeBatches)
                 {
-                    int remainingToDeduct = basePiecesDeducted;
-                    foreach (var batch in activeBatches)
-                    {
-                        if (remainingToDeduct <= 0) break;
+                    if (remainingToDeduct <= 0) break;
 
-                        int deductFromBatch = Math.Min(batch.Quantity, remainingToDeduct);
-                        batch.Quantity -= deductFromBatch;
-                        remainingToDeduct -= deductFromBatch;
+                    int deductFromBatch = Math.Min(batch.Quantity, remainingToDeduct);
+                    batch.Quantity -= deductFromBatch;
+                    remainingToDeduct -= deductFromBatch;
 
-                        context.ProductBatches.Update(batch);
-                    }
-
-                    product.Stock = Math.Max(0, product.Stock - basePiecesDeducted);
+                    context.ProductBatches.Update(batch);
                 }
+
+                product.Stock = Math.Max(0, product.Stock - basePiecesDeducted);
                 // ----------------------------------
 
                 transaction.Items.Add(new TransactionItem
@@ -142,7 +135,7 @@ public class CreateTransactionHandler(
             else
             {
                 if (transaction.CashReceived < transaction.TotalAmount)
-                    throw new Exception($"Insufficient cash. Required: â‚±{transaction.TotalAmount:N2}, Received: â‚±{transaction.CashReceived:N2}");
+                    throw new Exception($"Insufficient cash. Required: ₱{transaction.TotalAmount:N2}, Received: ₱{transaction.CashReceived:N2}");
 
                 transaction.ChangeAmount = transaction.CashReceived - transaction.TotalAmount;
             }
