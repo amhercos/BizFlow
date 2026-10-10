@@ -1,4 +1,4 @@
-﻿using Application.Features.Auth.Commands;
+using Application.Features.Auth.Commands;
 using Application.Features.Auth.Queries;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
@@ -39,14 +39,21 @@ namespace pos_webapi.Controllers
         [HttpPost("register-storeowner")]
         public async Task<IActionResult> RegisterMerchant([FromBody] RegisterStoreOwnerCommand command)
         {
-            var result = await mediator.Send(command);
-
-            if (result)
+            try
             {
-                return Ok(new { message = "Store and Owner registered successfully." });
-            }
+                var result = await mediator.Send(command);
 
-            return BadRequest(new { message = "Registration failed." });
+                if (result)
+                {
+                    return Ok(new { message = "Store and Owner registered successfully." });
+                }
+
+                return BadRequest(new { message = "Registration failed." });
+            }
+            catch (RegistrationException ex)
+            {
+                return BadRequest(new { message = ex.Message, field = ex.Field });
+            }
         }
 
 

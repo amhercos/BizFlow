@@ -42,7 +42,7 @@ export const PaymentSection = memo(
     ...creditProps
   }: PaymentSectionProps) => {
     const font = useInter();
-    const exactTender = Math.ceil(dueAmount);
+    const exactTender = Math.round(dueAmount * 100) / 100;
     const hasCash = cashReceived > 0;
 
     return (

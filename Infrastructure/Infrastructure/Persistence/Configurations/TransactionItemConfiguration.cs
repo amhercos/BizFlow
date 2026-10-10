@@ -1,4 +1,4 @@
-﻿using Domain.Entities;
+using Domain.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -14,6 +14,9 @@ namespace Infrastructure.Persistence.Configurations
                 .IsRequired();
 
             builder.Property(ti => ti.UnitPrice)
+                .HasPrecision(18, 2);
+
+            builder.Property(ti => ti.LineTotal)
                 .HasPrecision(18, 2);
 
             // Unit of Measurement Configurations

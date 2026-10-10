@@ -50,6 +50,9 @@ public class CreateTransactionHandler(
 
             foreach (var itemReq in request.Items)
             {
+                if (itemReq.Quantity <= 0)
+                    throw new Exception($"Invalid quantity for product: {itemReq.ProductId}");
+
                 if (!productMap.TryGetValue(itemReq.ProductId, out var product))
                     throw new Exception($"Product not found: {itemReq.ProductId}");
 
@@ -57,7 +60,7 @@ public class CreateTransactionHandler(
                 var ratio = isPack ? (product.PiecesPerPack ?? 1) : 1;
                 var basePiecesDeducted = itemReq.Quantity * ratio;
 
-                // --- FEFO BATCH STOCK DEDUCTION ---
+                // --- FEFO BATCH STOCK DEDUCTION (free items are deducted exactly like sold items) ---
                 var activeBatches = await context.ProductBatches
                     .Where(b => b.ProductId == product.Id && b.Quantity > 0 && !b.IsDeleted)
                     .OrderBy(b => b.ExpiryDate)
@@ -93,34 +96,55 @@ public class CreateTransactionHandler(
                     Quantity = itemReq.Quantity,
                     UnitType = isPack ? "Pack" : "Piece",
                     ConversionRatio = ratio,
-                    UnitPrice = isPack ? (product.PackPrice ?? product.Price) : product.Price,
+                    IsFree = itemReq.IsFree,
+                    UnitPrice = itemReq.IsFree ? 0m : (isPack ? (product.PackPrice ?? product.Price) : product.Price),
                     StoreId = storeId
                 });
             }
 
+            // Promotions only consider PAID lines (free items never take part in a promo).
+            var paidItems = transaction.Items.Where(i => !i.IsFree).ToList();
+
             var discountedLineTotals = new Dictionary<Guid, decimal>();
-            foreach (var item in transaction.Items)
+            if (request.PaymentType != PaymentType.Credit)
             {
-                var product = productMap[item.ProductId];
-                if (request.PaymentType != PaymentType.Credit && item.UnitType == "Piece")
+                foreach (var item in paidItems.Where(i => i.UnitType == "Piece"))
                 {
+                    var product = productMap[item.ProductId];
                     discountedLineTotals[item.Id] = promotionEngine.CalculateLineTotal(
                         product,
                         item.Quantity,
-                        transaction.Items,
+                        paidItems,
                         activePromotions);
                 }
             }
 
+            // Exact line totals: the transaction total is the sum of these, so a bundle always costs
+            // exactly its configured price (no re-rounding of per-unit prices).
             foreach (var item in transaction.Items)
             {
-                if (!discountedLineTotals.TryGetValue(item.Id, out var lineTotal) || item.Quantity <= 0)
+                if (item.IsFree)
+                {
+                    item.UnitPrice = 0m;
+                    item.LineTotal = 0m;
                     continue;
+                }
 
-                item.UnitPrice = Math.Round(lineTotal / item.Quantity, 2, MidpointRounding.AwayFromZero);
+                if (item.Quantity > 0 && discountedLineTotals.TryGetValue(item.Id, out var promoLineTotal))
+                {
+                    item.LineTotal = Math.Round(promoLineTotal, 2, MidpointRounding.AwayFromZero);
+                    item.UnitPrice = Math.Round(item.LineTotal / item.Quantity, 2, MidpointRounding.AwayFromZero);
+                }
+                else
+                {
+                    item.LineTotal = Math.Round(item.Quantity * item.UnitPrice, 2, MidpointRounding.AwayFromZero);
+                }
             }
 
-            transaction.TotalAmount = Math.Round(transaction.Items.Sum(x => x.Quantity * x.UnitPrice), 2, MidpointRounding.AwayFromZero);
+            transaction.TotalAmount = Math.Round(
+                transaction.Items.Where(i => !i.IsFree).Sum(i => i.LineTotal),
+                2,
+                MidpointRounding.AwayFromZero);
 
             if (transaction.PaymentType == PaymentType.Credit)
             {

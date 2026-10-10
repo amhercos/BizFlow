@@ -1,4 +1,4 @@
-﻿using Application.Dto;
+using Application.Dto;
 using Application.Interfaces;
 using Application.Interfaces.Repositories;
 using MediatR;
@@ -34,7 +34,8 @@ namespace Application.Features.Transactions.Queries
                     item.Product?.Name ?? "Deleted Product",
                     item.Quantity,
                     item.UnitPrice,
-                    item.Quantity * item.UnitPrice
+                    item.TotalPrice,
+                    item.IsFree
                 )).ToList()
             );
         }

@@ -1,4 +1,4 @@
-﻿using Application.Interfaces.Repositories;
+using Application.Interfaces.Repositories;
 using Domain.Entities;
 using Domain.Entities.Enums;
 using System;
@@ -13,7 +13,7 @@ namespace Application.Services.Pricing
 
         public decimal CalculateLineTotal(Product itemProduct, Promotion promo, int itemQuantity, IEnumerable<TransactionItem> basket)
         {
-            decimal originalTotal = itemQuantity * itemProduct.Price;
+            decimal originalTotal = Math.Round(itemQuantity * itemProduct.Price, 2, MidpointRounding.AwayFromZero);
 
             if (!promo.IsActive || promo.TieUpProductId == null || promo.Tiers == null || !promo.Tiers.Any())
             {
@@ -31,21 +31,23 @@ namespace Application.Services.Pricing
                 return originalTotal;
             }
 
-            // 1. Define required quantities per bundle set
+            // 1. Required quantities per bundle set + the configured bundle price
             int mainRequiredQty = bundleTier.Quantity > 0 ? bundleTier.Quantity : 1;
             int tieUpRequiredQty = promo.TieUpQuantity is > 0 ? promo.TieUpQuantity.Value : 1;
             decimal fixedBundlePrice = bundleTier.Price;
 
-            // 2. Fetch both main and tie-up items from the basket
+            // 2. Find the partner line in the basket (paid, piece lines only: never a pack line or a free item)
+            var paidPieceLines = basket.Where(i => !i.IsFree && i.UnitType == "Piece");
+
             var mainBasketItem = isMainProduct
                 ? new { Quantity = itemQuantity, UnitPrice = itemProduct.Price }
-                : basket.Where(i => i.ProductId == promo.MainProductId)
+                : paidPieceLines.Where(i => i.ProductId == promo.MainProductId)
                         .Select(i => new { i.Quantity, i.UnitPrice })
                         .FirstOrDefault();
 
             var tieUpBasketItem = isTieUpProduct
                 ? new { Quantity = itemQuantity, UnitPrice = itemProduct.Price }
-                : basket.Where(i => i.ProductId == promo.TieUpProductId)
+                : paidPieceLines.Where(i => i.ProductId == promo.TieUpProductId)
                         .Select(i => new { i.Quantity, i.UnitPrice })
                         .FirstOrDefault();
 
@@ -54,7 +56,7 @@ namespace Application.Services.Pricing
                 return originalTotal;
             }
 
-            // 3. Determine maximum complete bundles
+            // 3. Complete bundles
             int completeBundles = Math.Min(
                 mainBasketItem.Quantity / mainRequiredQty,
                 tieUpBasketItem.Quantity / tieUpRequiredQty
@@ -65,28 +67,27 @@ namespace Application.Services.Pricing
                 return originalTotal;
             }
 
-            // 4. Calculate standard un-discounted cost of 1 bundle set
+            // 4. Standard cost of one bundle set
             decimal mainSetCost = mainRequiredQty * mainBasketItem.UnitPrice;
             decimal tieUpSetCost = tieUpRequiredQty * tieUpBasketItem.UnitPrice;
             decimal standardBundleCost = mainSetCost + tieUpSetCost;
 
-            if (standardBundleCost <= fixedBundlePrice)
+            if (standardBundleCost <= 0 || standardBundleCost <= fixedBundlePrice)
             {
                 return originalTotal;
             }
 
-            // 5. Total discount saved per bundle set
-            decimal totalDiscountPerBundle = standardBundleCost - fixedBundlePrice;
+            // 5. EXACT allocation: the bundle sets cost exactly (bundles x configured price).
+            //    The main line gets its proportional share rounded to the centavo; the tie-up line gets
+            //    the remainder, so both lines always add up to the configured price with no stray decimals.
+            decimal totalCharge = completeBundles * fixedBundlePrice;
+            decimal mainCharge = Math.Round(totalCharge * mainSetCost / standardBundleCost, 2, MidpointRounding.AwayFromZero);
+            decimal tieUpCharge = totalCharge - mainCharge;
 
-            // 6. Calculate THIS line item's proportional share of the discount
-            decimal currentItemSetCost = isMainProduct ? mainSetCost : tieUpSetCost;
-            decimal currentDiscountShareRatio = currentItemSetCost / standardBundleCost;
-            decimal currentDiscountPerBundle = totalDiscountPerBundle * currentDiscountShareRatio;
+            decimal setCostTotal = completeBundles * (isMainProduct ? mainSetCost : tieUpSetCost);
+            decimal charge = isMainProduct ? mainCharge : tieUpCharge;
 
-            // 7. Apply discount for all completed bundle sets
-            decimal totalLineDiscount = currentDiscountPerBundle * completeBundles;
-
-            return Math.Max(0, originalTotal - totalLineDiscount);
+            return Math.Max(0m, originalTotal - setCostTotal + charge);
         }
     }
 }

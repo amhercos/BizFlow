@@ -14,6 +14,8 @@ interface BillDetailsProps {
   isCalculating: boolean;
   amountTendered?: number;
   promotions?: AppliedPromoLine[];
+  freebieCount?: number;
+  freebieValue?: number;
 }
 
 export const BillDetails: React.FC<BillDetailsProps> = ({
@@ -22,6 +24,8 @@ export const BillDetails: React.FC<BillDetailsProps> = ({
   isCalculating,
   amountTendered = 0,
   promotions = [],
+  freebieCount = 0,
+  freebieValue = 0,
 }) => {
   const font = useInter();
   const change =
@@ -63,6 +67,16 @@ export const BillDetails: React.FC<BillDetailsProps> = ({
         </View>
       ) : null}
 
+            {freebieCount > 0 ? (
+        <View style={styles.row}>
+          <Text style={[styles.label, typeface(font.medium, "500")]}>
+            Freebies ({freebieCount} given free)
+          </Text>
+          <Text style={[styles.value, typeface(font.medium, "500")]}>
+            {formatPHP(freebieValue)} value
+          </Text>
+        </View>
+      ) : null}
       <View style={styles.hairline} />
 
       <View style={styles.row}>

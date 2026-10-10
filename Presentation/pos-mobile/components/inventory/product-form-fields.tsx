@@ -1,9 +1,8 @@
-import { typeface, useInter } from "@/src/theme/typography";
-import type { Category } from "@/src/types/inventory";
-import { Calendar, Check, Search, X } from "lucide-react-native";
-import React, { useEffect, useMemo, useState } from "react";
+﻿import { typeface, useInter } from "@/src/theme/typography";
+import type { Category, ProductFormState } from "@/src/types/inventory";
+import { Calendar, Plus, Search, X } from "lucide-react-native";
+import React, { useState } from "react";
 import {
-  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -16,24 +15,16 @@ const INK = "#0F172A";
 const MUTED = "#64748B";
 const TINT = "#2563EB";
 
-export type ProductFormState = {
-  name: string;
-  price: string;
-  packPrice: string;
-  piecesPerPack: string;
-  stockQuantity: string;
-  categoryId: string | null;
-  description: string;
-  expiryDate: string;
-};
-
 interface ProductFormFieldsProps {
   formData: ProductFormState;
-  setFormData: (next: ProductFormState) => void;
+  setFormData: React.Dispatch<React.SetStateAction<ProductFormState>>;
   categories: Category[];
   onOpenCategoryManager: () => void;
   onPickDate: () => void;
   onClearExpiry?: () => void;
+  onOpenBatchModal?: () => void;
+  isExpiryReadOnly?: boolean;
+  isStockReadOnly?: boolean;
 }
 
 export function ProductFormFields({
@@ -43,275 +34,289 @@ export function ProductFormFields({
   onOpenCategoryManager,
   onPickDate,
   onClearExpiry,
+  onOpenBatchModal,
+  isExpiryReadOnly = false,
+  isStockReadOnly = false,
 }: ProductFormFieldsProps) {
   const font = useInter();
-  const [searchQuery, setSearchQuery] = useState("");
-  const [isFocused, setIsFocused] = useState(false);
+  const [categorySearch, setCategorySearch] = useState<string>("");
 
-  useEffect(() => {
-    if (isFocused) return;
-    const name =
-      categories.find((category) => category.id === formData.categoryId)
-        ?.name ?? "";
-    setSearchQuery(name);
-  }, [formData.categoryId, categories, isFocused]);
-
-  const filteredCategories = useMemo(() => {
-    const query = searchQuery.toLowerCase().trim();
-    return query
-      ? categories.filter((c) => c.name.toLowerCase().includes(query))
-      : categories.slice(0, 5);
-  }, [categories, searchQuery]);
-
-  const patch = (partial: Partial<ProductFormState>) =>
-    setFormData({ ...formData, ...partial });
+  const filteredCategories = categories.filter((cat: Category) =>
+    cat.name.toLowerCase().includes(categorySearch.toLowerCase()),
+  );
 
   return (
-    <View style={styles.stack}>
-      <Field label="Name" font={font}>
+    <View style={styles.container}>
+      {/* Product Name */}
+      <View style={styles.fieldGroup}>
+        <Text style={[styles.label, typeface(font.medium, "500")]}>
+          Product Name *
+        </Text>
         <TextInput
-          placeholder="Item name"
+          style={[styles.input, typeface(font.regular, "400")]}
+          placeholder="e.g. Premium Chocolate"
           placeholderTextColor="#94A3B8"
           value={formData.name}
-          onChangeText={(name) => patch({ name })}
-          style={[styles.input, typeface(font.medium, "500")]}
+          onChangeText={(text: string) =>
+            setFormData((prev: ProductFormState) => ({ ...prev, name: text }))
+          }
         />
-      </Field>
+      </View>
 
-      <View>
-        <View style={styles.labelRow}>
+      {/* Category Selection with Uniform Search Input */}
+      <View style={styles.fieldGroup}>
+        <View style={styles.rowBetween}>
           <Text style={[styles.label, typeface(font.medium, "500")]}>
             Category
           </Text>
           <TouchableOpacity onPress={onOpenCategoryManager}>
-            <Text style={[styles.link, typeface(font.medium, "500")]}>
+            <Text style={[styles.manageLink, typeface(font.semibold, "600")]}>
               Manage
             </Text>
           </TouchableOpacity>
         </View>
-        <View>
-          <View style={styles.search}>
-            <Search size={16} color="#94A3B8" />
-            <TextInput
-              placeholder="Search category"
-              placeholderTextColor="#94A3B8"
-              value={searchQuery}
-              onFocus={() => setIsFocused(true)}
-              onBlur={() => setTimeout(() => setIsFocused(false), 200)}
-              onChangeText={setSearchQuery}
-              style={[styles.searchInput, typeface(font.medium, "500")]}
-            />
-            {searchQuery.length > 0 ? (
-              <Pressable
-                onPress={() => {
-                  setSearchQuery("");
-                  patch({ categoryId: null });
-                }}
-                hitSlop={8}
+
+        <View style={styles.searchInputContainer}>
+          <Search size={16} color={MUTED} style={styles.searchIcon} />
+          <TextInput
+            style={[styles.searchUniformInput, typeface(font.regular, "400")]}
+            placeholder="Search category..."
+            placeholderTextColor="#94A3B8"
+            value={categorySearch}
+            onChangeText={(text: string) => setCategorySearch(text)}
+          />
+          {categorySearch.length > 0 && (
+            <TouchableOpacity
+              onPress={() => setCategorySearch("")}
+              hitSlop={8}
+              style={styles.clearSearchBtn}
+            >
+              <X size={16} color={MUTED} />
+            </TouchableOpacity>
+          )}
+        </View>
+
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={styles.categoryScroll}
+        >
+          <TouchableOpacity
+            style={[
+              styles.categoryChip,
+              formData.categoryId === null && styles.categoryChipActive,
+            ]}
+            onPress={() =>
+              setFormData((prev: ProductFormState) => ({
+                ...prev,
+                categoryId: null,
+              }))
+            }
+          >
+            <Text
+              style={[
+                styles.categoryChipText,
+                formData.categoryId === null && styles.categoryChipTextActive,
+              ]}
+            >
+              Uncategorized
+            </Text>
+          </TouchableOpacity>
+          {filteredCategories.map((cat: Category) => (
+            <TouchableOpacity
+              key={cat.id}
+              style={[
+                styles.categoryChip,
+                formData.categoryId === cat.id && styles.categoryChipActive,
+              ]}
+              onPress={() =>
+                setFormData((prev: ProductFormState) => ({
+                  ...prev,
+                  categoryId: cat.id,
+                }))
+              }
+            >
+              <Text
+                style={[
+                  styles.categoryChipText,
+                  formData.categoryId === cat.id &&
+                    styles.categoryChipTextActive,
+                ]}
               >
-                <X size={14} color="#94A3B8" />
-              </Pressable>
-            ) : null}
-          </View>
-          {isFocused ? (
-            <View style={styles.dropdown}>
-              <ScrollView keyboardShouldPersistTaps="handled" bounces={false}>
-                {filteredCategories.length === 0 ? (
-                  <Text style={[styles.empty, typeface(font.regular, "400")]}>
-                    No categories
-                  </Text>
-                ) : (
-                  filteredCategories.map((category) => {
-                    const active = formData.categoryId === category.id;
-                    return (
-                      <Pressable
-                        key={category.id}
-                        onPress={() => {
-                          patch({ categoryId: category.id });
-                          setSearchQuery(category.name);
-                          setIsFocused(false);
-                        }}
-                        style={styles.option}
-                      >
-                        <Text
-                          style={[
-                            styles.optionText,
-                            active && styles.optionOn,
-                            typeface(font.medium, "500"),
-                          ]}
-                        >
-                          {category.name}
-                        </Text>
-                        {active ? <Check size={16} color={TINT} /> : null}
-                      </Pressable>
-                    );
-                  })
-                )}
-              </ScrollView>
-            </View>
-          ) : null}
-        </View>
-      </View>
-
-      <View style={styles.row}>
-        <Field label="Piece price" font={font} flex>
-          <TextInput
-            keyboardType="numeric"
-            placeholder="0.00"
-            placeholderTextColor="#94A3B8"
-            value={formData.price}
-            onChangeText={(price) => patch({ price })}
-            style={[styles.input, typeface(font.medium, "500")]}
-          />
-        </Field>
-        <Field label="Stock (pcs)" font={font} flex>
-          <TextInput
-            keyboardType="numeric"
-            placeholder="Qty"
-            placeholderTextColor="#94A3B8"
-            value={formData.stockQuantity}
-            onChangeText={(stockQuantity) => patch({ stockQuantity })}
-            style={[styles.input, typeface(font.medium, "500")]}
-          />
-        </Field>
-      </View>
-
-      <View>
-        <Text style={[styles.sectionHeader, typeface(font.semibold, "600")]}>
-          Pack selling (optional)
-        </Text>
-        <View style={styles.row}>
-          <Field label="Pack price" font={font} flex>
-            <TextInput
-              keyboardType="numeric"
-              placeholder="0.00"
-              placeholderTextColor="#94A3B8"
-              value={formData.packPrice}
-              onChangeText={(packPrice) => patch({ packPrice })}
-              style={[styles.input, typeface(font.medium, "500")]}
-            />
-          </Field>
-          <Field label="Pcs / pack" font={font} flex>
-            <TextInput
-              keyboardType="numeric"
-              placeholder="Qty"
-              placeholderTextColor="#94A3B8"
-              value={formData.piecesPerPack}
-              onChangeText={(piecesPerPack) => patch({ piecesPerPack })}
-              style={[styles.input, typeface(font.medium, "500")]}
-            />
-          </Field>
-        </View>
-        <Text style={[styles.hint, typeface(font.regular, "400")]}>
-          Fill both to sell by pack. Leave blank for piece only.
-        </Text>
-      </View>
-
-      <View>
-        <View style={styles.labelRow}>
-          <Text style={[styles.label, typeface(font.medium, "500")]}>
-            Expiry
-          </Text>
-          {formData.expiryDate && onClearExpiry ? (
-            <TouchableOpacity onPress={onClearExpiry}>
-              <Text style={[styles.clear, typeface(font.medium, "500")]}>
-                Clear
+                {cat.name}
               </Text>
             </TouchableOpacity>
-          ) : null}
-        </View>
-        <Pressable onPress={onPickDate} style={styles.dateBtn}>
-          <Text
-            style={[
-              styles.dateText,
-              !formData.expiryDate && { color: "#94A3B8" },
-              typeface(font.medium, "500"),
-            ]}
-          >
-            {formData.expiryDate || "Set expiry date"}
-          </Text>
-          <Calendar size={16} color="#94A3B8" />
-        </Pressable>
+          ))}
+        </ScrollView>
       </View>
 
-      <Field label="Description (optional)" font={font}>
+      {/* Price & Stock */}
+      <View style={styles.row}>
+        <View style={[styles.fieldGroup, { flex: 1 }]}>
+          <Text style={[styles.label, typeface(font.medium, "500")]}>
+            Piece Price *
+          </Text>
+          <TextInput
+            style={[styles.input, typeface(font.regular, "400")]}
+            placeholder="0.00"
+            placeholderTextColor="#94A3B8"
+            keyboardType="numeric"
+            value={formData.price}
+            onChangeText={(text: string) =>
+              setFormData((prev: ProductFormState) => ({
+                ...prev,
+                price: text,
+              }))
+            }
+          />
+        </View>
+        <View style={[styles.fieldGroup, { flex: 1 }]}>
+          <View style={styles.rowBetween}>
+            <Text style={[styles.label, typeface(font.medium, "500")]}>
+              {isStockReadOnly ? "Total Stock" : "Initial Stock *"}
+            </Text>
+            {onOpenBatchModal && (
+              <TouchableOpacity
+                onPress={onOpenBatchModal}
+                style={styles.plusBatchBadge}
+              >
+                <Plus size={12} color="#166534" />
+                <Text
+                  style={[styles.plusBatchText, typeface(font.semibold, "600")]}
+                >
+                  Restock
+                </Text>
+              </TouchableOpacity>
+            )}
+          </View>
+          <TextInput
+            style={[
+              styles.input,
+              isStockReadOnly && styles.disabledInput,
+              typeface(font.regular, "400"),
+            ]}
+            placeholder="0"
+            placeholderTextColor="#94A3B8"
+            keyboardType="numeric"
+            value={formData.stockQuantity}
+            editable={!isStockReadOnly}
+            onChangeText={(text: string) =>
+              setFormData((prev: ProductFormState) => ({
+                ...prev,
+                stockQuantity: text,
+              }))
+            }
+          />
+        </View>
+      </View>
+
+      {/* Pack Configuration */}
+      <View style={styles.row}>
+        <View style={[styles.fieldGroup, { flex: 1 }]}>
+          <Text style={[styles.label, typeface(font.medium, "500")]}>
+            Pack Price (Optional)
+          </Text>
+          <TextInput
+            style={[styles.input, typeface(font.regular, "400")]}
+            placeholder="0.00"
+            placeholderTextColor="#94A3B8"
+            keyboardType="numeric"
+            value={formData.packPrice}
+            onChangeText={(text: string) =>
+              setFormData((prev: ProductFormState) => ({
+                ...prev,
+                packPrice: text,
+              }))
+            }
+          />
+        </View>
+        <View style={[styles.fieldGroup, { flex: 1 }]}>
+          <Text style={[styles.label, typeface(font.medium, "500")]}>
+            Pieces / Pack
+          </Text>
+          <TextInput
+            style={[styles.input, typeface(font.regular, "400")]}
+            placeholder="e.g. 12"
+            placeholderTextColor="#94A3B8"
+            keyboardType="numeric"
+            value={formData.piecesPerPack}
+            onChangeText={(text: string) =>
+              setFormData((prev: ProductFormState) => ({
+                ...prev,
+                piecesPerPack: text,
+              }))
+            }
+          />
+        </View>
+      </View>
+
+      {/* Expiry Date Field */}
+      <View style={styles.fieldGroup}>
+        <View style={styles.rowBetween}>
+          <Text style={[styles.label, typeface(font.medium, "500")]}>
+            Initial Batch Expiry Date
+          </Text>
+          {isExpiryReadOnly && (
+            <Text style={[styles.readOnlyBadge, typeface(font.medium, "500")]}>
+              Auto (Nearest Batch)
+            </Text>
+          )}
+        </View>
+        <TouchableOpacity
+          style={[styles.input, isExpiryReadOnly && styles.disabledInput]}
+          onPress={isExpiryReadOnly ? undefined : onPickDate}
+          activeOpacity={isExpiryReadOnly ? 1 : 0.7}
+        >
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+            <Calendar size={18} color={MUTED} />
+            <Text
+              style={[
+                styles.dateText,
+                !formData.expiryDate && styles.placeholderText,
+                typeface(font.regular, "400"),
+              ]}
+            >
+              {formData.expiryDate
+                ? formData.expiryDate
+                : "Select expiry date (optional)"}
+            </Text>
+          </View>
+          {!isExpiryReadOnly && formData.expiryDate && onClearExpiry && (
+            <TouchableOpacity onPress={onClearExpiry} hitSlop={8}>
+              <X size={16} color={MUTED} />
+            </TouchableOpacity>
+          )}
+        </TouchableOpacity>
+      </View>
+
+      {/* Description */}
+      <View style={styles.fieldGroup}>
+        <Text style={[styles.label, typeface(font.medium, "500")]}>
+          Description
+        </Text>
         <TextInput
+          style={[styles.textArea, typeface(font.regular, "400")]}
+          placeholder="Optional product notes..."
+          placeholderTextColor="#94A3B8"
           multiline
           numberOfLines={3}
-          placeholder="Notes about this product"
-          placeholderTextColor="#94A3B8"
           value={formData.description}
-          onChangeText={(description) => patch({ description })}
-          style={[styles.input, styles.area, typeface(font.medium, "500")]}
+          onChangeText={(text: string) =>
+            setFormData((prev: ProductFormState) => ({
+              ...prev,
+              description: text,
+            }))
+          }
         />
-      </Field>
-    </View>
-  );
-}
-
-function Field({
-  label,
-  font,
-  flex,
-  children,
-}: {
-  label: string;
-  font: ReturnType<typeof useInter>;
-  flex?: boolean;
-  children: React.ReactNode;
-}) {
-  return (
-    <View style={flex ? styles.flex : undefined}>
-      <Text
-        style={[
-          styles.label,
-          { marginBottom: 8 },
-          typeface(font.medium, "500"),
-        ]}
-      >
-        {label}
-      </Text>
-      {children}
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  stack: {
-    gap: 18,
-  },
-  row: {
-    flexDirection: "row",
-    gap: 10,
-  },
-  flex: {
-    flex: 1,
-  },
-  labelRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 8,
-  },
-  sectionHeader: {
-    fontSize: 13,
-    color: INK,
-    marginBottom: 10,
-  },
-  label: {
-    fontSize: 13,
-    color: MUTED,
-  },
-  link: {
-    fontSize: 13,
-    color: TINT,
-    marginBottom: 8,
-  },
-  clear: {
-    fontSize: 13,
-    color: "#E11D48",
-    marginBottom: 8,
-  },
+  container: { gap: 14 },
+  fieldGroup: { gap: 6 },
+  label: { fontSize: 13, color: INK },
   input: {
     backgroundColor: "#EEF1F6",
     borderRadius: 14,
@@ -319,69 +324,62 @@ const styles = StyleSheet.create({
     height: 46,
     fontSize: 15,
     color: INK,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
   },
-  area: {
-    height: 88,
+  textArea: {
+    backgroundColor: "#EEF1F6",
+    borderRadius: 14,
+    paddingHorizontal: 14,
     paddingTop: 12,
+    height: 88,
+    fontSize: 15,
+    color: INK,
     textAlignVertical: "top",
   },
-  search: {
+  row: { flexDirection: "row", gap: 12 },
+  rowBetween: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  manageLink: { fontSize: 12, color: TINT },
+  plusBatchBadge: {
     flexDirection: "row",
     alignItems: "center",
+    backgroundColor: "#DCFCE7",
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+    gap: 2,
+  },
+  plusBatchText: { fontSize: 11, color: "#166534" },
+  searchInputContainer: {
     backgroundColor: "#EEF1F6",
     borderRadius: 14,
-    paddingHorizontal: 14,
     height: 46,
-    gap: 8,
-  },
-  searchInput: {
-    flex: 1,
-    fontSize: 15,
-    color: INK,
-    paddingVertical: 0,
-  },
-  dropdown: {
-    marginTop: 6,
-    backgroundColor: "#FFFFFF",
-    borderRadius: 14,
-    maxHeight: 168,
-    overflow: "hidden",
-  },
-  option: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
     paddingHorizontal: 14,
-    paddingVertical: 12,
+    marginBottom: 6,
   },
-  optionText: {
-    fontSize: 15,
-    color: INK,
-  },
-  optionOn: {
-    color: TINT,
-  },
-  empty: {
-    padding: 14,
-    fontSize: 14,
-    color: MUTED,
-  },
-  hint: {
-    marginTop: 8,
-    fontSize: 12,
-    color: MUTED,
-  },
-  dateBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
+  searchIcon: { marginRight: 8 },
+  searchUniformInput: { flex: 1, fontSize: 15, color: INK, paddingVertical: 0 },
+  clearSearchBtn: { padding: 4 },
+  categoryScroll: { flexDirection: "row" },
+  categoryChip: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
     backgroundColor: "#EEF1F6",
-    borderRadius: 14,
-    paddingHorizontal: 14,
-    height: 46,
+    marginRight: 8,
   },
-  dateText: {
-    fontSize: 15,
-    color: INK,
-  },
+  categoryChipActive: { backgroundColor: TINT },
+  categoryChipText: { fontSize: 13, color: MUTED },
+  categoryChipTextActive: { color: "#FFFFFF" },
+  disabledInput: { opacity: 0.8, backgroundColor: "#E2E8F0" },
+  readOnlyBadge: { fontSize: 11, color: "#059669" },
+  dateText: { fontSize: 15, color: INK },
+  placeholderText: { color: "#94A3B8" },
 });
