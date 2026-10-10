@@ -123,7 +123,7 @@ export default function SettingsScreen() {
   } = useSettings();
 
   const [pwModalVisible, setPwModalVisible] = useState(false);
-  const [viewMode, setViewMode] = useState<"menu" | "profile" | "store">(
+  const [viewMode, setViewMode] = useState<"menu" | "profile" | "store" | "about">(
     "menu",
   );
 
@@ -132,7 +132,18 @@ export default function SettingsScreen() {
       ? "Profile"
       : viewMode === "store"
         ? "Store"
-        : "Settings";
+        : viewMode === "about"
+          ? "About BizFlow"
+          : "Settings";
+
+  const subtitle =
+    viewMode === "menu"
+      ? roleLabel(user?.role)
+      : viewMode === "profile"
+        ? "Your account"
+        : viewMode === "store"
+          ? "Store preferences"
+          : "Application details";
 
   return (
     <View style={[styles.screen, { paddingTop: insets.top + 10 }]}>
@@ -151,11 +162,7 @@ export default function SettingsScreen() {
         <View style={styles.identity}>
           <Text style={[styles.title, typeface(font.bold, "700")]}>{title}</Text>
           <Text style={[styles.subtitle, typeface(font.medium, "500")]}>
-            {viewMode === "menu"
-              ? roleLabel(user?.role)
-              : viewMode === "profile"
-                ? "Your account"
-                : "Store preferences"}
+            {subtitle}
           </Text>
         </View>
       </View>
@@ -276,6 +283,81 @@ export default function SettingsScreen() {
             </Text>
           </TouchableOpacity>
         </ScrollView>
+      ) : viewMode === "about" ? (
+        <ScrollView
+          contentContainerStyle={styles.body}
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={styles.aboutCard}>
+            <Text style={[styles.aboutParagraph, typeface(font.regular, "400")]}>
+              BizFlow is an Android application designed to help small retail stores manage their daily business operations more easily and accurately. It provides tools for monitoring inventory, recording customer credits, tracking sales, managing special pricing and promotions, and receiving alerts for low-stock, out-of-stock, near-expiry, and expired products.
+            </Text>
+            <Text style={[styles.aboutParagraph, typeface(font.regular, "400"), { marginTop: 12 }]}>
+              The system also helps store owners keep their product and transaction records organized in one application. BizFlow aims to reduce errors from manual recording and make inventory and credit monitoring faster and more convenient.
+            </Text>
+          </View>
+
+          <Text style={[styles.section, typeface(font.bold, "700")]}>
+            Information
+          </Text>
+          <View style={styles.group}>
+            <View style={styles.infoRow}>
+              <Text style={[styles.infoLabel, typeface(font.medium, "500")]}>Application</Text>
+              <Text style={[styles.infoValue, typeface(font.semibold, "600")]}>BizFlow</Text>
+            </View>
+            <View style={styles.hairline} />
+            <View style={styles.infoRow}>
+              <Text style={[styles.infoLabel, typeface(font.medium, "500")]}>Version</Text>
+              <Text style={[styles.infoValue, typeface(font.semibold, "600")]}>1.0</Text>
+            </View>
+            <View style={styles.hairline} />
+            <View style={styles.infoRow}>
+              <Text style={[styles.infoLabel, typeface(font.medium, "500")]}>Platform</Text>
+              <Text style={[styles.infoValue, typeface(font.semibold, "600")]}>Android</Text>
+            </View>
+            <View style={styles.hairline} />
+            <View style={styles.infoRow}>
+              <Text style={[styles.infoLabel, typeface(font.medium, "500")]}>Purpose</Text>
+              <Text style={[styles.infoValue, typeface(font.semibold, "600"), { flex: 1, textAlign: "right" }]}>
+                Inventory & Credit Monitoring
+              </Text>
+            </View>
+          </View>
+
+          <Text style={[styles.section, typeface(font.bold, "700")]}>
+            Developers
+          </Text>
+          <View style={styles.group}>
+            <View style={styles.infoRow}>
+              <Text style={[styles.infoValue, typeface(font.semibold, "600"), { width: "100%", textAlign: "left" }]}>
+                PJ D. Montecalvo
+              </Text>
+            </View>
+            <View style={styles.hairline} />
+            <View style={styles.infoRow}>
+              <Text style={[styles.infoValue, typeface(font.semibold, "600"), { width: "100%", textAlign: "left" }]}>
+                Mabeth Ordinaria
+              </Text>
+            </View>
+            <View style={styles.hairline} />
+            <View style={styles.infoRow}>
+              <Text style={[styles.infoValue, typeface(font.semibold, "600"), { width: "100%", textAlign: "left" }]}>
+                Mark Jushua V. Ageas
+              </Text>
+            </View>
+          </View>
+
+          <Text style={[styles.section, typeface(font.bold, "700")]}>
+            Adviser
+          </Text>
+          <View style={styles.group}>
+            <View style={styles.infoRow}>
+              <Text style={[styles.infoValue, typeface(font.semibold, "600"), { width: "100%", textAlign: "left" }]}>
+                Christine June M. Jumawan
+              </Text>
+            </View>
+          </View>
+        </ScrollView>
       ) : (
         <ScrollView
           contentContainerStyle={styles.body}
@@ -345,7 +427,7 @@ export default function SettingsScreen() {
               icon={Info}
               label="About BizFlow"
               isLast
-              onPress={() => {}}
+              onPress={() => setViewMode("about")}
             />
           </View>
 
@@ -482,7 +564,7 @@ const styles = StyleSheet.create({
   hairline: {
     height: StyleSheet.hairlineWidth,
     backgroundColor: LINE,
-    marginLeft: 58,
+    marginLeft: 14,
   },
   field: {
     marginBottom: 14,
@@ -521,6 +603,32 @@ const styles = StyleSheet.create({
   saveText: {
     fontSize: 16,
     color: "#FFFFFF",
+  },
+  aboutCard: {
+    backgroundColor: "#F4F6FA",
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 8,
+  },
+  aboutParagraph: {
+    fontSize: 14,
+    lineHeight: 22,
+    color: INK,
+  },
+  infoRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+  },
+  infoLabel: {
+    fontSize: 14,
+    color: MUTED,
+  },
+  infoValue: {
+    fontSize: 14,
+    color: INK,
   },
   foot: {
     marginTop: 28,

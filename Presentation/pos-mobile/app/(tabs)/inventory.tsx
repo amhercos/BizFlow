@@ -5,25 +5,26 @@ import { typeface, useInter } from "@/src/theme/typography";
 import type { Category, Product } from "@/src/types/inventory";
 import * as Haptics from "expo-haptics";
 import {
-    FolderPlus,
-    LayoutGrid,
-    List as ListIcon,
-    Plus,
-    Search,
-    X,
+  FolderPlus,
+  LayoutGrid,
+  List as ListIcon,
+  Plus,
+  Search,
+  X,
 } from "lucide-react-native";
 import { Skeleton } from "moti/skeleton";
 import React, { ReactElement, useCallback, useMemo, useState } from "react";
 import {
-    Pressable,
-    RefreshControl,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
-    useWindowDimensions,
+  FlatList,
+  Pressable,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+  useWindowDimensions,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -199,9 +200,200 @@ export default function InventoryScreen(): ReactElement {
 
   const gridItemWidth = (width - 56) / 2;
 
+  const renderHeaderControls = () => (
+    <View>
+      <View style={styles.header}>
+        <DrawerMenuButton />
+        <View style={styles.identity}>
+          <Text style={[styles.title, typeface(font.bold, "700")]}>
+            Inventory
+          </Text>
+          <Text style={[styles.subtitle, typeface(font.medium, "500")]}>
+            {loading && products.length === 0
+              ? "Loading stock"
+              : `${filteredProducts.length} item${filteredProducts.length === 1 ? "" : "s"}`}
+          </Text>
+        </View>
+        <TouchableOpacity
+          onPress={() => setModals((m) => ({ ...m, cat: true }))}
+          style={styles.headerGhost}
+          accessibilityLabel="Manage categories"
+        >
+          <FolderPlus size={14} color={INK} strokeWidth={1.8} />
+          <Text
+            style={[styles.headerGhostText, typeface(font.medium, "500")]}
+          >
+            Category
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          onPress={() => setModals((m) => ({ ...m, add: true }))}
+          style={styles.headerAdd}
+          accessibilityLabel="Add product"
+        >
+          <Plus size={14} color="#FFFFFF" strokeWidth={2.2} />
+          <Text
+            style={[styles.headerAddText, typeface(font.semibold, "600")]}
+          >
+            Add
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      <View style={styles.statRow}>
+        {(
+          [
+            {
+              id: "low-stock" as const,
+              label: "Low",
+              value: stats.low,
+              hot: "#B45309",
+              wash: "#FDE6D4",
+            },
+            {
+              id: "out-of-stock" as const,
+              label: "Out",
+              value: stats.out,
+              hot: "#BE123C",
+              wash: "#FDECEC",
+            },
+            {
+              id: "expired" as const,
+              label: "Expired",
+              value: stats.expired,
+              hot: "#BE123C",
+              wash: "#FDECEC",
+            },
+          ] as const
+        ).map((item) => {
+          const active = activeFilter === item.id;
+          const display =
+            loading && products.length === 0 ? "—" : String(item.value);
+          const hot = item.value > 0;
+          return (
+            <Pressable
+              key={item.id}
+              onPress={() => setFilter(active ? "all" : item.id)}
+              style={[
+                styles.stat,
+                hot && { backgroundColor: item.wash },
+                active && styles.statOn,
+              ]}
+            >
+              <Text
+                style={[
+                  styles.statLabel,
+                  active && styles.statLabelOn,
+                  typeface(font.medium, "500"),
+                ]}
+              >
+                {item.label}
+              </Text>
+              <Text
+                style={[
+                  styles.statValue,
+                  { color: hot ? item.hot : INK },
+                  typeface(font.semibold, "600"),
+                ]}
+              >
+                {display}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
+
+      <View style={styles.search}>
+        <Search size={16} color="#94A3B8" strokeWidth={2} />
+        <TextInput
+          placeholder="Search products"
+          placeholderTextColor="#94A3B8"
+          value={search}
+          onChangeText={setSearch}
+          autoCapitalize="none"
+          autoCorrect={false}
+          style={[styles.searchInput, typeface(font.medium, "500")]}
+        />
+        {search.length > 0 ? (
+          <Pressable onPress={() => setSearch("")} hitSlop={8}>
+            <X size={14} color="#94A3B8" />
+          </Pressable>
+        ) : null}
+      </View>
+
+      <FilterBar
+        activeFilter={activeFilter}
+        setActiveFilter={setFilter}
+        categories={filteredCategories}
+        categorySearch={categorySearch}
+        setCategorySearch={setCategorySearch}
+        loading={loading && categories.length === 0}
+        fontFamily={font.medium}
+      />
+
+      <View style={styles.listHead}>
+        <Text style={[styles.listTitle, typeface(font.bold, "700")]}>
+          Products
+        </Text>
+        <View style={styles.metricToggle}>
+          <Pressable
+            onPress={() => setViewMode(ViewMode.TABLE)}
+            style={[
+              styles.metricChip,
+              viewMode === ViewMode.TABLE && styles.metricChipOn,
+            ]}
+          >
+            <ListIcon
+              size={14}
+              color={viewMode === ViewMode.TABLE ? INK : MUTED}
+            />
+          </Pressable>
+          <Pressable
+            onPress={() => setViewMode(ViewMode.GRID)}
+            style={[
+              styles.metricChip,
+              viewMode === ViewMode.GRID && styles.metricChipOn,
+            ]}
+          >
+            <LayoutGrid
+              size={14}
+              color={viewMode === ViewMode.GRID ? INK : MUTED}
+            />
+          </Pressable>
+        </View>
+      </View>
+
+      {loading && products.length === 0 ? (
+        <View style={{ marginTop: 8 }}>
+          {[1, 2, 3, 4, 5, 6].map((i) => (
+            <View key={i} style={{ paddingVertical: 12 }}>
+              <Skeleton
+                colorMode="light"
+                width="100%"
+                height={18}
+                radius={6}
+              />
+            </View>
+          ))}
+        </View>
+      ) : filteredProducts.length === 0 ? (
+        <Text style={[styles.empty, typeface(font.regular, "400")]}>
+          No products match this filter
+        </Text>
+      ) : viewMode === ViewMode.TABLE ? (
+        <InventoryTable
+          products={filteredProducts}
+          onDelete={handleDeletePress}
+          onEdit={handleEditPress}
+          font={font}
+        />
+      ) : null}
+    </View>
+  );
+
   return (
     <View style={styles.screen}>
-      <ScrollView
+      <FlatList
         style={styles.screen}
         contentContainerStyle={{
           paddingTop: insets.top + 10,
@@ -217,208 +409,25 @@ export default function InventoryScreen(): ReactElement {
             tintColor={TINT}
           />
         }
-      >
-        <View style={styles.header}>
-          <DrawerMenuButton />
-          <View style={styles.identity}>
-            <Text style={[styles.title, typeface(font.bold, "700")]}>
-              Inventory
-            </Text>
-            <Text style={[styles.subtitle, typeface(font.medium, "500")]}>
-              {loading && products.length === 0
-                ? "Loading stock"
-                : `${filteredProducts.length} item${filteredProducts.length === 1 ? "" : "s"}`}
-            </Text>
-          </View>
-          <TouchableOpacity
-            onPress={() => setModals((m) => ({ ...m, cat: true }))}
-            style={styles.headerGhost}
-            accessibilityLabel="Manage categories"
-          >
-            <FolderPlus size={14} color={INK} strokeWidth={1.8} />
-            <Text
-              style={[styles.headerGhostText, typeface(font.medium, "500")]}
-            >
-              Category
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            onPress={() => setModals((m) => ({ ...m, add: true }))}
-            style={styles.headerAdd}
-            accessibilityLabel="Add product"
-          >
-            <Plus size={14} color="#FFFFFF" strokeWidth={2.2} />
-            <Text
-              style={[styles.headerAddText, typeface(font.semibold, "600")]}
-            >
-              Add
-            </Text>
-          </TouchableOpacity>
-        </View>
-
-        <View style={styles.statRow}>
-          {(
-            [
-              {
-                id: "low-stock" as const,
-                label: "Low",
-                value: stats.low,
-                hot: "#B45309",
-                wash: "#FDE6D4",
-              },
-              {
-                id: "out-of-stock" as const,
-                label: "Out",
-                value: stats.out,
-                hot: "#BE123C",
-                wash: "#FDECEC",
-              },
-              {
-                id: "expired" as const,
-                label: "Expired",
-                value: stats.expired,
-                hot: "#BE123C",
-                wash: "#FDECEC",
-              },
-            ] as const
-          ).map((item) => {
-            const active = activeFilter === item.id;
-            const display =
-              loading && products.length === 0 ? "—" : String(item.value);
-            const hot = item.value > 0;
-            return (
-              <Pressable
-                key={item.id}
-                onPress={() => setFilter(active ? "all" : item.id)}
-                style={[
-                  styles.stat,
-                  hot && { backgroundColor: item.wash },
-                  active && styles.statOn,
-                ]}
-              >
-                <Text
-                  style={[
-                    styles.statLabel,
-                    active && styles.statLabelOn,
-                    typeface(font.medium, "500"),
-                  ]}
-                >
-                  {item.label}
-                </Text>
-                <Text
-                  style={[
-                    styles.statValue,
-                    { color: hot ? item.hot : INK },
-                    typeface(font.semibold, "600"),
-                  ]}
-                >
-                  {display}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </View>
-
-        <View style={styles.search}>
-          <Search size={16} color="#94A3B8" strokeWidth={2} />
-          <TextInput
-            placeholder="Search products"
-            placeholderTextColor="#94A3B8"
-            value={search}
-            onChangeText={setSearch}
-            autoCapitalize="none"
-            autoCorrect={false}
-            style={[styles.searchInput, typeface(font.medium, "500")]}
+        data={viewMode === ViewMode.GRID ? filteredProducts : []}
+        keyExtractor={(item) => item.id}
+        key={viewMode}
+        numColumns={viewMode === ViewMode.GRID ? 2 : 1}
+        columnWrapperStyle={
+          viewMode === ViewMode.GRID ? styles.gridRow : undefined
+        }
+        ListHeaderComponent={renderHeaderControls}
+        renderItem={({ item }) => (
+          <InventoryGridCard
+            product={item}
+            width={gridItemWidth}
+            fontFamily={font.semibold}
+            metaFamily={font.medium}
+            onEdit={() => handleEditPress(item)}
+            onDelete={() => handleDeletePress(item)}
           />
-          {search.length > 0 ? (
-            <Pressable onPress={() => setSearch("")} hitSlop={8}>
-              <X size={14} color="#94A3B8" />
-            </Pressable>
-          ) : null}
-        </View>
-
-        <FilterBar
-          activeFilter={activeFilter}
-          setActiveFilter={setFilter}
-          categories={filteredCategories}
-          categorySearch={categorySearch}
-          setCategorySearch={setCategorySearch}
-          loading={loading && categories.length === 0}
-          fontFamily={font.medium}
-        />
-
-        <View style={styles.listHead}>
-          <Text style={[styles.listTitle, typeface(font.bold, "700")]}>
-            Products
-          </Text>
-          <View style={styles.metricToggle}>
-            <Pressable
-              onPress={() => setViewMode(ViewMode.TABLE)}
-              style={[
-                styles.metricChip,
-                viewMode === ViewMode.TABLE && styles.metricChipOn,
-              ]}
-            >
-              <ListIcon
-                size={14}
-                color={viewMode === ViewMode.TABLE ? INK : MUTED}
-              />
-            </Pressable>
-            <Pressable
-              onPress={() => setViewMode(ViewMode.GRID)}
-              style={[
-                styles.metricChip,
-                viewMode === ViewMode.GRID && styles.metricChipOn,
-              ]}
-            >
-              <LayoutGrid
-                size={14}
-                color={viewMode === ViewMode.GRID ? INK : MUTED}
-              />
-            </Pressable>
-          </View>
-        </View>
-
-        {loading && products.length === 0 ? (
-          <View style={{ marginTop: 8 }}>
-            {[1, 2, 3, 4, 5, 6].map((i) => (
-              <View key={i} style={{ paddingVertical: 12 }}>
-                <Skeleton
-                  colorMode="light"
-                  width="100%"
-                  height={18}
-                  radius={6}
-                />
-              </View>
-            ))}
-          </View>
-        ) : filteredProducts.length === 0 ? (
-          <Text style={[styles.empty, typeface(font.regular, "400")]}>
-            No products match this filter
-          </Text>
-        ) : viewMode === ViewMode.TABLE ? (
-          <InventoryTable
-            products={filteredProducts}
-            onDelete={handleDeletePress}
-            onEdit={handleEditPress}
-            font={font}
-          />
-        ) : (
-          <View style={styles.grid}>
-            {filteredProducts.map((product) => (
-              <InventoryGridCard
-                key={product.id}
-                product={product}
-                width={gridItemWidth}
-                fontFamily={font.semibold}
-                metaFamily={font.medium}
-                onEdit={() => handleEditPress(product)}
-                onDelete={() => handleDeletePress(product)}
-              />
-            ))}
-          </View>
         )}
-      </ScrollView>
+      />
 
       <CategoryManagerModal
         isOpen={modals.cat}
@@ -862,9 +871,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: MUTED,
   },
-  grid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
+  gridRow: {
     justifyContent: "space-between",
   },
   gridCard: {

@@ -45,6 +45,16 @@ export function CreditSummarySheet({
       year: "numeric",
     });
 
+  const formatTimestamp = (dateStr: string) =>
+    new Date(dateStr).toLocaleString("en-PH", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+      hour12: true,
+    });
+
   return (
     <Modal
       visible={isOpen}
@@ -127,29 +137,39 @@ export function CreditSummarySheet({
               </Text>
             ) : (
               <View style={styles.list}>
-                {summary.creditPurchases.map((purchase, index) => (
+                {summary.creditPurchases.map((purchase, pIndex) => (
                   <View key={purchase.id}>
-                    {index > 0 ? <View style={styles.hairline} /> : null}
-                    <View style={styles.row}>
-                      <View style={styles.rowBody}>
-                        <Text
-                          style={[styles.rowName, typeface(font.semibold, "600")]}
-                        >
-                          {purchase.itemCount}{" "}
-                          {purchase.itemCount === 1 ? "item" : "items"}
-                        </Text>
-                        <Text
-                          style={[styles.rowMeta, typeface(font.medium, "500")]}
-                        >
-                          {formatDate(purchase.transactionDate)}
-                        </Text>
-                      </View>
-                      <Text
-                        style={[styles.rowAmount, typeface(font.semibold, "600")]}
-                      >
+                    {pIndex > 0 ? <View style={styles.hairline} /> : null}
+                    <View style={styles.purchaseHeader}>
+                      <Text style={[styles.purchaseDate, typeface(font.semibold, "600")]}>
+                        {formatDate(purchase.transactionDate)}
+                      </Text>
+                      <Text style={[styles.purchaseTotal, typeface(font.bold, "700")]}>
                         {formatPHP(purchase.totalAmount)}
                       </Text>
                     </View>
+                    {purchase.items && purchase.items.length > 0 ? (
+                      <View style={styles.itemsContainer}>
+                        {purchase.items.map((item, iIndex) => (
+                          <View key={iIndex} style={styles.itemRow}>
+                            <Text style={[styles.itemName, typeface(font.medium, "500")]} numberOfLines={1}>
+                              {item.quantity}x {item.productName}
+                            </Text>
+                            <Text style={[styles.itemSubtotal, typeface(font.medium, "500")]}>
+                              {formatPHP(item.subTotal)}
+                            </Text>
+                          </View>
+                        ))}
+                      </View>
+                    ) : (
+                      <View style={styles.row}>
+                        <View style={styles.rowBody}>
+                          <Text style={[styles.rowName, typeface(font.semibold, "600")]}>
+                            {purchase.itemCount} {purchase.itemCount === 1 ? "item" : "items"}
+                          </Text>
+                        </View>
+                      </View>
+                    )}
                   </View>
                 ))}
               </View>
@@ -178,7 +198,7 @@ export function CreditSummarySheet({
                         <Text
                           style={[styles.rowMeta, typeface(font.medium, "500")]}
                         >
-                          {formatDate(payment.paymentDate)}
+                          {formatTimestamp(payment.paymentDate)}
                         </Text>
                       </View>
                       <Text
@@ -284,6 +304,42 @@ const styles = StyleSheet.create({
     backgroundColor: "#F4F6FA",
     borderRadius: 16,
     overflow: "hidden",
+  },
+  purchaseHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: 14,
+    paddingTop: 12,
+    paddingBottom: 4,
+  },
+  purchaseDate: {
+    fontSize: 13,
+    color: MUTED,
+  },
+  purchaseTotal: {
+    fontSize: 14,
+    color: TINT,
+  },
+  itemsContainer: {
+    paddingHorizontal: 14,
+    paddingBottom: 12,
+  },
+  itemRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: 4,
+    paddingLeft: 8,
+  },
+  itemName: {
+    fontSize: 14,
+    color: INK,
+    flex: 1,
+  },
+  itemSubtotal: {
+    fontSize: 14,
+    color: MUTED,
   },
   row: {
     flexDirection: "row",

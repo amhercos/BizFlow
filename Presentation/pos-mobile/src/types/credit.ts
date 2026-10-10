@@ -14,12 +14,20 @@ export interface CustomerCredit {
   creditAmount: number;
 }
 
+export interface CreditPurchaseItem {
+  productName: string;
+  quantity: number;
+  unitPrice: number;
+  subTotal: number;
+}
+
 export interface CreditPurchase {
   id: string;
   transactionDate: string;
   totalAmount: number;
   paymentType: string;
   itemCount: number;
+  items: CreditPurchaseItem[];
 }
 
 export interface PaymentHistory {
