@@ -56,7 +56,7 @@ public class UpdateProductHandler(
                         StoreId = product.StoreId,
                         ProductId = product.Id,
                         Quantity = stockDifference,
-                        ExpiryDate = request.ExpiryDate ?? DateTime.UtcNow.AddYears(1),
+                        ExpiryDate = request.ExpiryDate ?? DateOnly.FromDateTime(DateTime.UtcNow.AddYears(1)),
                         IsDeleted = false
                     };
                     await productRepository.AddBatchAsync(newBatch, ct);
