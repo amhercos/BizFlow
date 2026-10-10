@@ -13,4 +13,5 @@ public class ProductBatch : BaseEntity, ITenantEntity
 
     public int Quantity { get; set; }
     public DateOnly ExpiryDate { get; set; }
+    public bool IsDeleted { get; set; }
 }
