@@ -1,4 +1,4 @@
-﻿using Application.Dto;
+using Application.Dto;
 using Application.Features.Products.Commands;
 using Application.Features.Products.Queries;
 using MediatR;
@@ -14,7 +14,7 @@ namespace pos_webapi.Controllers
     [ApiController]
     public class ProductController(IMediator mediator) : ControllerBase
     {
-        [Authorize (Roles = "StoreOwner" )]
+        [Authorize(Roles = "StoreOwner")]
         [HttpPost]
         public async Task<IActionResult> Create([FromBody] CreateProductCommand command)
         {
@@ -30,7 +30,6 @@ namespace pos_webapi.Controllers
             return Ok(result);
         }
 
-
         [HttpGet("{id}")]
         public async Task<IActionResult> GetById(Guid id)
         {
@@ -41,7 +40,6 @@ namespace pos_webapi.Controllers
             return Ok(product);
         }
 
-       
         [HttpDelete("{id}")]
         [Authorize(Roles = "StoreOwner")]
         public async Task<IActionResult> Delete(Guid id)
@@ -60,6 +58,19 @@ namespace pos_webapi.Controllers
 
             var result = await mediator.Send(commandWithId);
             return Ok(result);
+        }
+
+        [HttpPost("batches")]
+        [Authorize(Roles = "StoreOwner,Cashier")]
+        public async Task<IActionResult> CreateBatch([FromBody] CreateProductBatchCommand command)
+        {
+            var storeIdClaim = User.FindFirst("StoreId")?.Value;
+            if (!Guid.TryParse(storeIdClaim, out var storeId)) return Unauthorized();
+
+            var commandWithStore = command with { StoreId = storeId };
+            var batchId = await mediator.Send(commandWithStore);
+
+            return Ok(new { BatchId = batchId, Message = "Product batch created and stock updated successfully." });
         }
 
         [HttpGet("near-expiry")]
