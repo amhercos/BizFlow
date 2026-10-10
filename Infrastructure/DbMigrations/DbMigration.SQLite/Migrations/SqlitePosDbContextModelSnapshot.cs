@@ -49,7 +49,7 @@ namespace DbMigration.SQLite.Migrations
 
                     b.HasIndex("StoreId");
 
-                    b.ToTable("Categories");
+                    b.ToTable("Categories", (string)null);
                 });
 
             modelBuilder.Entity("Domain.Entities.CreditPayment", b =>
@@ -91,7 +91,7 @@ namespace DbMigration.SQLite.Migrations
 
                     b.HasIndex("StoreId");
 
-                    b.ToTable("CreditPayments");
+                    b.ToTable("CreditPayments", (string)null);
                 });
 
             modelBuilder.Entity("Domain.Entities.CustomerCredit", b =>
@@ -130,7 +130,7 @@ namespace DbMigration.SQLite.Migrations
 
                     b.HasIndex("StoreId");
 
-                    b.ToTable("CustomerCredits");
+                    b.ToTable("CustomerCredits", (string)null);
                 });
 
             modelBuilder.Entity("Domain.Entities.Product", b =>
@@ -193,7 +193,7 @@ namespace DbMigration.SQLite.Migrations
                         .IsUnique()
                         .HasFilter("\"IsDeleted\" = false");
 
-                    b.ToTable("Products");
+                    b.ToTable("Products", (string)null);
                 });
 
             modelBuilder.Entity("Domain.Entities.Store", b =>
@@ -222,7 +222,7 @@ namespace DbMigration.SQLite.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("Stores");
+                    b.ToTable("Stores", (string)null);
                 });
 
             modelBuilder.Entity("Domain.Entities.StoreSettings", b =>
@@ -258,7 +258,7 @@ namespace DbMigration.SQLite.Migrations
                     b.HasIndex("StoreId")
                         .IsUnique();
 
-                    b.ToTable("StoreSettings");
+                    b.ToTable("StoreSettings", (string)null);
                 });
 
             modelBuilder.Entity("Domain.Entities.Transaction", b =>
@@ -317,7 +317,7 @@ namespace DbMigration.SQLite.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("Transactions");
+                    b.ToTable("Transactions", (string)null);
                 });
 
             modelBuilder.Entity("Domain.Entities.TransactionItem", b =>
@@ -356,7 +356,7 @@ namespace DbMigration.SQLite.Migrations
 
                     b.HasIndex("TransactionId");
 
-                    b.ToTable("TransactionItems");
+                    b.ToTable("TransactionItems", (string)null);
                 });
 
             modelBuilder.Entity("Domain.Entities.User", b =>
