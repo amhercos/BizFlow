@@ -1,4 +1,4 @@
-﻿using Domain.Entities.Common;
+using Domain.Entities.Common;
 using System;
 
 namespace Domain.Entities
@@ -15,6 +15,13 @@ namespace Domain.Entities
         public string UnitType { get; set; } = "Piece"; // "Piece" or "Pack"
         public int ConversionRatio { get; set; } = 1; // 1 for Piece, PiecesPerPack for Pack
         public decimal UnitPrice { get; set; }
-        public decimal TotalPrice => Quantity * UnitPrice;
+
+        /// <summary>Given away for free: stock is deducted, but it is not part of the sale total.</summary>
+        public bool IsFree { get; set; }
+
+        /// <summary>Exact amount charged for this line (promo-aware, rounded to centavos).</summary>
+        public decimal LineTotal { get; set; }
+
+        public decimal TotalPrice => IsFree ? 0m : (LineTotal > 0 ? LineTotal : Quantity * UnitPrice);
     }
 }

@@ -1,4 +1,4 @@
-﻿namespace Application.Dto;
+namespace Application.Dto;
 
 public record TransactionDetailsDto(
     Guid Id,
@@ -14,4 +14,5 @@ public record TransactionItemDto(
     string ProductName,
     int Quantity,
     decimal UnitPrice,
-    decimal SubTotal);
+    decimal SubTotal,
+    bool IsFree = false);
