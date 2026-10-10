@@ -51,8 +51,8 @@ export function ProductFormFields({
   useEffect(() => {
     if (isFocused) return;
     const name =
-      categories.find((category) => category.id === formData.categoryId)?.name ??
-      "";
+      categories.find((category) => category.id === formData.categoryId)
+        ?.name ?? "";
     setSearchQuery(name);
   }, [formData.categoryId, categories, isFocused]);
 
@@ -80,9 +80,13 @@ export function ProductFormFields({
 
       <View>
         <View style={styles.labelRow}>
-          <Text style={[styles.label, typeface(font.medium, "500")]}>Category</Text>
+          <Text style={[styles.label, typeface(font.medium, "500")]}>
+            Category
+          </Text>
           <TouchableOpacity onPress={onOpenCategoryManager}>
-            <Text style={[styles.link, typeface(font.medium, "500")]}>Manage</Text>
+            <Text style={[styles.link, typeface(font.medium, "500")]}>
+              Manage
+            </Text>
           </TouchableOpacity>
         </View>
         <View>
@@ -173,26 +177,30 @@ export function ProductFormFields({
       </View>
 
       <View>
-        <Text style={[styles.label, { marginBottom: 8 }, typeface(font.medium, "500")]}>
+        <Text style={[styles.sectionHeader, typeface(font.semibold, "600")]}>
           Pack selling (optional)
         </Text>
         <View style={styles.row}>
-          <TextInput
-            keyboardType="numeric"
-            placeholder="Pack price"
-            placeholderTextColor="#94A3B8"
-            value={formData.packPrice}
-            onChangeText={(packPrice) => patch({ packPrice })}
-            style={[styles.input, styles.flex, typeface(font.medium, "500")]}
-          />
-          <TextInput
-            keyboardType="numeric"
-            placeholder="Pcs / pack"
-            placeholderTextColor="#94A3B8"
-            value={formData.piecesPerPack}
-            onChangeText={(piecesPerPack) => patch({ piecesPerPack })}
-            style={[styles.input, styles.flex, typeface(font.medium, "500")]}
-          />
+          <Field label="Pack price" font={font} flex>
+            <TextInput
+              keyboardType="numeric"
+              placeholder="0.00"
+              placeholderTextColor="#94A3B8"
+              value={formData.packPrice}
+              onChangeText={(packPrice) => patch({ packPrice })}
+              style={[styles.input, typeface(font.medium, "500")]}
+            />
+          </Field>
+          <Field label="Pcs / pack" font={font} flex>
+            <TextInput
+              keyboardType="numeric"
+              placeholder="Qty"
+              placeholderTextColor="#94A3B8"
+              value={formData.piecesPerPack}
+              onChangeText={(piecesPerPack) => patch({ piecesPerPack })}
+              style={[styles.input, typeface(font.medium, "500")]}
+            />
+          </Field>
         </View>
         <Text style={[styles.hint, typeface(font.regular, "400")]}>
           Fill both to sell by pack. Leave blank for piece only.
@@ -201,10 +209,14 @@ export function ProductFormFields({
 
       <View>
         <View style={styles.labelRow}>
-          <Text style={[styles.label, typeface(font.medium, "500")]}>Expiry</Text>
+          <Text style={[styles.label, typeface(font.medium, "500")]}>
+            Expiry
+          </Text>
           {formData.expiryDate && onClearExpiry ? (
             <TouchableOpacity onPress={onClearExpiry}>
-              <Text style={[styles.clear, typeface(font.medium, "500")]}>Clear</Text>
+              <Text style={[styles.clear, typeface(font.medium, "500")]}>
+                Clear
+              </Text>
             </TouchableOpacity>
           ) : null}
         </View>
@@ -250,7 +262,15 @@ function Field({
 }) {
   return (
     <View style={flex ? styles.flex : undefined}>
-      <Text style={[styles.label, { marginBottom: 8 }, typeface(font.medium, "500")]}>{label}</Text>
+      <Text
+        style={[
+          styles.label,
+          { marginBottom: 8 },
+          typeface(font.medium, "500"),
+        ]}
+      >
+        {label}
+      </Text>
       {children}
     </View>
   );
@@ -272,6 +292,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     marginBottom: 8,
+  },
+  sectionHeader: {
+    fontSize: 13,
+    color: INK,
+    marginBottom: 10,
   },
   label: {
     fontSize: 13,

@@ -1,7 +1,8 @@
-﻿using Domain.Entities;
+using Domain.Entities;
 using System;
 using System.Collections.Generic;
-using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace Application.Interfaces.Repositories
 {
@@ -14,7 +15,8 @@ namespace Application.Interfaces.Repositories
         void Remove(Product product);
         void Update(Product product);
         Task<int> CountLowStockAsync(Guid storeId, CancellationToken ct);
-        Task<List<Product>> GetNearExpiryProductsAsync(Guid storeId);
+        Task<List<ProductBatch>> GetNearExpiryBatchesAsync(Guid storeId, int alertDays, CancellationToken ct);
+        Task AddBatchAsync(ProductBatch batch, CancellationToken ct);
         Task<List<Product>> GetByIdsWithPromotionsAsync(IEnumerable<Guid> ids, Guid storeId, CancellationToken ct);
     }
 }

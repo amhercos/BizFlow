@@ -1,4 +1,5 @@
-﻿    using Application.Interfaces;
+    using Application.Interfaces;
+using Infrastructure.Services;
     using Application.Interfaces.Repositories;
     using Domain.Entities;
     using Infrastructure.Persistence;
@@ -44,6 +45,7 @@
                 services.AddScoped<IUserRepository, UserRepository>();
                 services.AddScoped<ICategoryRepository, CategoryRepository>();
                 services.AddScoped<IProductRepository, ProductRepository>();
+        services.AddScoped<IInventoryDeductionService, InventoryDeductionService>();
                 services.AddScoped<ITransactionRepository, TransactionRepository>();
                 services.AddScoped<ICustomerCreditRepository, CustomerCreditRepository>();
                 services.AddScoped<IPromotionRepository, PromotionRepository>();

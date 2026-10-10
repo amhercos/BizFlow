@@ -81,7 +81,9 @@ public class TransactionRepository(PosDbContext context, ICurrentUserService cur
     {
         return await context.Transactions
             .AsNoTracking()
+            .IgnoreQueryFilters()
             .Include(t => t.Items)
+                .ThenInclude(i => i.Product)
             .Where(t => t.CustomerCreditId == customerCreditId)
             .OrderByDescending(t => t.TransactionDate)
             .ToListAsync(ct);

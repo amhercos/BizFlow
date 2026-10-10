@@ -1,10 +1,15 @@
-﻿using Application.Features.Transactions.Commands;
+using Application.Features.Transactions.Commands;
 using Application.Interfaces;
 using Application.Interfaces.Repositories;
 using Domain.Entities;
 using Domain.Entities.Enums;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace Application.Features.Transactions.Handlers;
 
@@ -23,6 +28,11 @@ public class CreateTransactionHandler(
 
         var products = await productRepository.GetByIdsWithPromotionsAsync(productIds, storeId, ct);
         var productMap = products.ToDictionary(p => p.Id);
+
+        var activePromotions = await context.Promotions
+            .Include(p => p.Tiers)
+            .Where(p => p.StoreId == storeId && p.IsActive && !p.IsDeleted)
+            .ToListAsync(ct);
 
         using var dbTransaction = await context.Database.BeginTransactionAsync(ct);
         try
@@ -47,10 +57,41 @@ public class CreateTransactionHandler(
                 var ratio = isPack ? (product.PiecesPerPack ?? 1) : 1;
                 var basePiecesDeducted = itemReq.Quantity * ratio;
 
-                if (product.Stock < basePiecesDeducted)
-                    throw new Exception($"Insufficient stock for: {product.Name}. Required: {basePiecesDeducted} pcs, Available: {product.Stock} pcs");
+                // --- FEFO BATCH STOCK DEDUCTION ---
+                var activeBatches = await context.ProductBatches
+                    .Where(b => b.ProductId == product.Id && b.StoreId == storeId && b.Quantity > 0 && !b.IsDeleted)
+                    .OrderBy(b => b.ExpiryDate) // Earliest expiry first (FEFO)
+                    .ToListAsync(ct);
 
-                product.Stock -= basePiecesDeducted;
+                var totalAvailableBatchStock = activeBatches.Sum(b => b.Quantity);
+                if (totalAvailableBatchStock < basePiecesDeducted)
+                {
+                    if (product.Stock >= basePiecesDeducted && activeBatches.Count == 0)
+                    {
+                        product.Stock -= basePiecesDeducted;
+                    }
+                    else
+                    {
+                        throw new Exception($"Insufficient stock for: {product.Name}. Required: {basePiecesDeducted} pcs, Available: {Math.Max(totalAvailableBatchStock, product.Stock)} pcs");
+                    }
+                }
+                else
+                {
+                    int remainingToDeduct = basePiecesDeducted;
+                    foreach (var batch in activeBatches)
+                    {
+                        if (remainingToDeduct <= 0) break;
+
+                        int deductFromBatch = Math.Min(batch.Quantity, remainingToDeduct);
+                        batch.Quantity -= deductFromBatch;
+                        remainingToDeduct -= deductFromBatch;
+
+                        context.ProductBatches.Update(batch);
+                    }
+
+                    product.Stock = activeBatches.Sum(b => b.Quantity);
+                }
+                // ----------------------------------
 
                 transaction.Items.Add(new TransactionItem
                 {
@@ -64,19 +105,17 @@ public class CreateTransactionHandler(
                 });
             }
 
-            // Price every line against the original retail basket so bundle tie-up
-            // math is not affected by another line's already-discounted unit price.
             var discountedLineTotals = new Dictionary<Guid, decimal>();
             foreach (var item in transaction.Items)
             {
                 var product = productMap[item.ProductId];
-
                 if (request.PaymentType != PaymentType.Credit && item.UnitType == "Piece")
                 {
                     discountedLineTotals[item.Id] = promotionEngine.CalculateLineTotal(
                         product,
                         item.Quantity,
-                        transaction.Items);
+                        transaction.Items,
+                        activePromotions);
                 }
             }
 
