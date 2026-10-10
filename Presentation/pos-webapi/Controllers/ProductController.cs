@@ -3,8 +3,6 @@ using Application.Features.Products.Commands;
 using Application.Features.Products.Queries;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 
 namespace pos_webapi.Controllers
@@ -34,9 +32,7 @@ namespace pos_webapi.Controllers
         public async Task<IActionResult> GetById(Guid id)
         {
             var product = await mediator.Send(new GetProductByIdQuery(id));
-
             if (product == null) return NotFound();
-
             return Ok(product);
         }
 
@@ -45,9 +41,7 @@ namespace pos_webapi.Controllers
         public async Task<IActionResult> Delete(Guid id)
         {
             var result = await mediator.Send(new DeleteProductCommand(id));
-
             if (!result) return NotFound();
-
             return NoContent();
         }
 
@@ -55,7 +49,6 @@ namespace pos_webapi.Controllers
         public async Task<ActionResult<ProductDto>> Update(Guid id, [FromBody] UpdateProductCommand command)
         {
             var commandWithId = command with { Id = id };
-
             var result = await mediator.Send(commandWithId);
             return Ok(result);
         }
@@ -73,14 +66,44 @@ namespace pos_webapi.Controllers
             return Ok(new { BatchId = batchId, Message = "Product batch created and stock updated successfully." });
         }
 
+        [HttpGet("{productId}/batches")]
+        [Authorize(Roles = "StoreOwner,Cashier")]
+        public async Task<IActionResult> GetBatches(Guid productId)
+        {
+            var batches = await mediator.Send(new GetProductBatchesQuery(productId));
+            return Ok(batches);
+        }
+
+        [HttpPut("batches/{batchId}")]
+        [Authorize(Roles = "StoreOwner,Cashier")]
+        public async Task<IActionResult> UpdateBatch(Guid batchId, [FromBody] UpdateProductBatchRequest request)
+        {
+            if (request.Quantity < 0)
+                return BadRequest(new { Message = "Quantity cannot be negative." });
+
+            var success = await mediator.Send(new UpdateProductBatchCommand(batchId, request.Quantity, request.ExpiryDate));
+            if (!success) return NotFound();
+            return Ok(new { Message = "Batch updated successfully." });
+        }
+
+        [HttpDelete("batches/{batchId}")]
+        [Authorize(Roles = "StoreOwner,Cashier")]
+        public async Task<IActionResult> DeleteBatch(Guid batchId)
+        {
+            var success = await mediator.Send(new DeleteProductBatchCommand(batchId));
+            if (!success) return NotFound();
+            return Ok(new { Message = "Batch deleted successfully." });
+        }
+
         [HttpGet("near-expiry")]
         public async Task<IActionResult> GetNearExpiry()
         {
             var storeIdClaim = User.FindFirst("StoreId")?.Value;
             if (!Guid.TryParse(storeIdClaim, out var storeId)) return Unauthorized();
             var result = await mediator.Send(new GetNearExpiryProductsQuery(storeId));
-
             return Ok(result);
         }
     }
+
+    public record UpdateProductBatchRequest(int Quantity, DateOnly? ExpiryDate);
 }
