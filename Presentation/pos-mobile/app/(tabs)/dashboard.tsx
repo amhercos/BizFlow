@@ -114,9 +114,7 @@ export default function DashboardScreen() {
       setWeekTx(week);
       setNearExpiry(expiry);
       setTopProducts(top.slice(0, 3));
-      setOutstanding(
-        stats?.totalOutstanding ?? stats?.totalActiveDebts ?? 0,
-      );
+      setOutstanding(stats?.totalOutstanding ?? stats?.totalActiveDebts ?? 0);
     } catch (err) {
       console.error("Dashboard Load Error:", err);
     } finally {
@@ -463,7 +461,7 @@ export default function DashboardScreen() {
 
       <View style={styles.recentHead}>
         <Text style={[styles.recentTitle, typeface(font.bold, "700")]}>
-          Recent
+          Recent Transactions
         </Text>
         {!loading ? (
           <TouchableOpacity

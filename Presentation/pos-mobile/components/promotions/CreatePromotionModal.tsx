@@ -36,17 +36,29 @@ interface CreatePromotionModalProps {
 
 type TierInput = Omit<PromotionTier, "id" | "promotionId">;
 
-const STRATEGIES: { id: PromotionType; label: string; hint: string }[] = [
+const STRATEGIES: {
+  id: PromotionType;
+  label: string;
+  hint: string;
+  placeholder: string;
+}[] = [
   {
     id: PromotionType.Discount,
     label: "Discount",
     hint: "Single item promo price",
+    placeholder: "e.g. 20% Off Iced Latte",
   },
-  { id: PromotionType.Bulk, label: "Bulk", hint: "Quantity price breaks" },
+  {
+    id: PromotionType.Bulk,
+    label: "Bulk",
+    hint: "Quantity price breaks",
+    placeholder: "e.g. Buy 3pcs for 10",
+  },
   {
     id: PromotionType.Bundle,
     label: "Bundle",
     hint: "Set fixed price for two items",
+    placeholder: "e.g. Buy 1 Coffee get 2 Cookie",
   },
 ];
 
@@ -70,7 +82,10 @@ export default function CreatePromotionModal({
 
   const isBulk = type === PromotionType.Bulk;
   const isBundle = type === PromotionType.Bundle;
-  const hint = STRATEGIES.find((item) => item.id === type)?.hint ?? "";
+
+  const currentStrategy = STRATEGIES.find((item) => item.id === type);
+  const hint = currentStrategy?.hint ?? "";
+  const promoPlaceholder = currentStrategy?.placeholder ?? "e.g. Special Promo";
 
   const selectedPrimaryProduct = useMemo(
     () => products?.find((p) => p.id === selectedProductId),
@@ -219,10 +234,10 @@ export default function CreatePromotionModal({
               })}
             </View>
 
-            {/* Promo Name */}
+            {/* Promo Name with Strategy-Aware Placeholder */}
             <Field label="Promo Title" font={font}>
               <TextInput
-                placeholder="e.g. Buy 1 Coffee get 2 Cookie"
+                placeholder={promoPlaceholder}
                 placeholderTextColor="#94A3B8"
                 value={name}
                 onChangeText={setName}
@@ -234,7 +249,7 @@ export default function CreatePromotionModal({
             {isBundle ? (
               <>
                 <ProductPicker
-                  label="Primary Product (Product A)"
+                  label="Main Product"
                   placeholder="Search main product (e.g., Coffee)"
                   query={productSearch}
                   selectedId={selectedProductId}
@@ -254,7 +269,7 @@ export default function CreatePromotionModal({
                   font={font}
                 />
                 <ProductPicker
-                  label="Pair Product (Product B)"
+                  label="Tie up Product"
                   placeholder="Search pair product (e.g., Cookie)"
                   query={tieUpSearch}
                   selectedId={tieUpProductId}

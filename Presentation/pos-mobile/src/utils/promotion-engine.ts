@@ -1,13 +1,19 @@
-import type { Promotion } from "../types/promotion";
+import type { Promotion, PromotionTier } from "../types/promotion";
 import type { AppliedPromotion, BasketItem } from "../types/sale";
 import { UnitType } from "../types/sale";
-import type { PromotionTier } from "../types/promotion";
 
 interface LineCalculation {
   discountedTotal: number;
   originalTotal: number;
   savings: number;
   appliedPromotionName: string | null;
+}
+
+/**
+ * Rounds numbers to 2 decimal places to prevent floating point inaccuracies.
+ */
+function round2(value: number): number {
+  return Math.round((value + Number.EPSILON) * 100) / 100;
 }
 
 function resolvePromoType(promo: {
@@ -25,12 +31,15 @@ function isPromoActive(promo: { isActive?: boolean }): boolean {
   return promo.isActive === true;
 }
 
-export function toAppliedPromotion(promo: Promotion | AppliedPromotion | any): AppliedPromotion {
+export function toAppliedPromotion(
+  promo: Promotion | AppliedPromotion | any,
+): AppliedPromotion {
   return {
     id: String(promo.id ?? ""),
     name: promo.name ?? "",
     isActive: isPromoActive(promo),
     promotionType: resolvePromoType(promo),
+    mainProductId: promo.mainProductId ?? null,
     tiers: (promo.tiers ?? []).map((tier: PromotionTier) => ({
       quantity: Number(tier.quantity) || 0,
       price: Number(tier.price) || 0,
@@ -48,7 +57,8 @@ export function promotionsForProduct(
   return catalog
     .filter(
       (promo) =>
-        promo.mainProductId === productId &&
+        (promo.mainProductId === productId ||
+          promo.tieUpProductId === productId) &&
         promo.isDeleted !== true &&
         isPromoActive(promo),
     )
@@ -80,18 +90,13 @@ export function calculateLineTotal(
   item: BasketItem,
   fullBasket: BasketItem[],
 ): LineCalculation {
-  const originalTotal = item.unitPrice * item.quantity;
+  const originalTotal = round2(item.unitPrice * item.quantity);
 
-  if (item.unitType === UnitType.Pack) {
-    return {
-      discountedTotal: originalTotal,
-      originalTotal,
-      savings: 0,
-      appliedPromotionName: null,
-    };
-  }
-
-  if (!item.promotions || item.promotions.length === 0) {
+  if (
+    item.unitType === UnitType.Pack ||
+    !item.promotions ||
+    item.promotions.length === 0
+  ) {
     return {
       discountedTotal: originalTotal,
       originalTotal,
@@ -112,11 +117,12 @@ export function calculateLineTotal(
 
   const strategyType = resolvePromoType(promo);
 
+  // --- DISCOUNT STRATEGY ---
   if (strategyType === "discount") {
     const sortedTiers = [...promo.tiers].sort(
       (a, b) => a.quantity - b.quantity,
     );
-    const discountTier: PromotionTier | undefined = sortedTiers[0];
+    const discountTier = sortedTiers[0];
     const minQty = discountTier?.quantity || 1;
 
     if (item.quantity < minQty) {
@@ -129,57 +135,120 @@ export function calculateLineTotal(
     }
 
     const targetUnitPrice = discountTier ? discountTier.price : item.unitPrice;
-    const discountedTotal = item.quantity * targetUnitPrice;
+    const discountedTotal = round2(item.quantity * targetUnitPrice);
+    const savings = round2(Math.max(0, originalTotal - discountedTotal));
+
     return {
       discountedTotal,
       originalTotal,
-      savings: Math.max(0, originalTotal - discountedTotal),
+      savings,
       appliedPromotionName: promo.name,
     };
   }
 
-  if (strategyType === "bundle" && promo.tieUpProductId) {
+  // --- BUNDLE STRATEGY ---
+  if (
+    strategyType === "bundle" &&
+    (promo.tieUpProductId || promo.mainProductId)
+  ) {
     const sortedTiers = [...promo.tiers].sort(
       (a, b) => a.quantity - b.quantity,
     );
     const bundleTier = sortedTiers[0];
+    if (!bundleTier) {
+      return {
+        discountedTotal: originalTotal,
+        originalTotal,
+        savings: 0,
+        appliedPromotionName: null,
+      };
+    }
 
-    const tieUpItem = fullBasket.find(
-      (entry) => entry.productId === promo.tieUpProductId,
-    );
-    const tieUpInCart = tieUpItem ? tieUpItem.quantity : 0;
+    const mainProductId = promo.mainProductId;
+    const tieUpProductId = promo.tieUpProductId;
 
-    const mainRequiredQty = bundleTier ? bundleTier.quantity : 1;
+    const isMainProduct = item.productId === mainProductId;
+    const isTieUpProduct = item.productId === tieUpProductId;
+
+    if (!isMainProduct && !isTieUpProduct) {
+      return {
+        discountedTotal: originalTotal,
+        originalTotal,
+        savings: 0,
+        appliedPromotionName: null,
+      };
+    }
+
+    const mainRequiredQty = bundleTier.quantity > 0 ? bundleTier.quantity : 1;
     const tieUpRequiredQty = promo.tieUpQuantity || 1;
 
-    const possibleBundlesByMain = Math.floor(item.quantity / mainRequiredQty);
-    const possibleBundlesByTieUp = Math.floor(tieUpInCart / tieUpRequiredQty);
+    const mainItem = isMainProduct
+      ? item
+      : fullBasket.find((entry) => entry.productId === mainProductId);
+
+    const tieUpItem = isTieUpProduct
+      ? item
+      : fullBasket.find((entry) => entry.productId === tieUpProductId);
+
+    if (!mainItem || !tieUpItem) {
+      return {
+        discountedTotal: originalTotal,
+        originalTotal,
+        savings: 0,
+        appliedPromotionName: null,
+      };
+    }
+
+    const possibleBundlesByMain = Math.floor(
+      mainItem.quantity / mainRequiredQty,
+    );
+    const possibleBundlesByTieUp = Math.floor(
+      tieUpItem.quantity / tieUpRequiredQty,
+    );
     const applicableBundleCount = Math.min(
       possibleBundlesByMain,
       possibleBundlesByTieUp,
     );
 
-    if (applicableBundleCount > 0 && bundleTier) {
-      const tieUpUnitPrice = tieUpItem ? tieUpItem.unitPrice : 0;
-
-      const standardMainBundleCost = mainRequiredQty * item.unitPrice;
-      const standardTieUpBundleCost = tieUpRequiredQty * tieUpUnitPrice;
-      const totalStandardCostForCombo =
-        standardMainBundleCost + standardTieUpBundleCost;
-
-      const packageDealSavings = Math.max(
-        0,
-        totalStandardCostForCombo - bundleTier.price,
+    if (applicableBundleCount > 0) {
+      const standardMainBundleCost = round2(
+        mainRequiredQty * mainItem.unitPrice,
       );
-      const totalSavingsForLine = packageDealSavings * applicableBundleCount;
-      const discountedTotal = Math.max(0, originalTotal - totalSavingsForLine);
+      const standardTieUpBundleCost = round2(
+        tieUpRequiredQty * tieUpItem.unitPrice,
+      );
+      const totalStandardCostForCombo = round2(
+        standardMainBundleCost + standardTieUpBundleCost,
+      );
 
-      return {
-        discountedTotal,
-        originalTotal,
-        savings: totalSavingsForLine,
-        appliedPromotionName: promo.name,
-      };
+      if (totalStandardCostForCombo > bundleTier.price) {
+        const totalDiscountPerBundle = round2(
+          totalStandardCostForCombo - bundleTier.price,
+        );
+
+        // Proportional discount allocation for current item line
+        const currentItemSetCost = isMainProduct
+          ? standardMainBundleCost
+          : standardTieUpBundleCost;
+        const discountShareRatio =
+          currentItemSetCost / totalStandardCostForCombo;
+        const currentItemDiscountPerBundle =
+          totalDiscountPerBundle * discountShareRatio;
+
+        const totalLineSavings = round2(
+          currentItemDiscountPerBundle * applicableBundleCount,
+        );
+        const discountedTotal = round2(
+          Math.max(0, originalTotal - totalLineSavings),
+        );
+
+        return {
+          discountedTotal,
+          originalTotal,
+          savings: totalLineSavings,
+          appliedPromotionName: promo.name,
+        };
+      }
     }
 
     return {
@@ -190,6 +259,7 @@ export function calculateLineTotal(
     };
   }
 
+  // --- BULK STRATEGY ---
   if (strategyType === "bulk") {
     let total = 0;
     let remainingQuantity = item.quantity;
@@ -207,12 +277,14 @@ export function calculateLineTotal(
     }
 
     total += remainingQuantity * item.unitPrice;
+    const discountedTotal = round2(total);
+    const savings = round2(Math.max(0, originalTotal - discountedTotal));
 
     return {
-      discountedTotal: total,
+      discountedTotal,
       originalTotal,
-      savings: Math.max(0, originalTotal - total),
-      appliedPromotionName: total < originalTotal ? promo.name : null,
+      savings,
+      appliedPromotionName: discountedTotal < originalTotal ? promo.name : null,
     };
   }
 

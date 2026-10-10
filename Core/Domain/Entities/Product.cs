@@ -1,10 +1,11 @@
-﻿using Domain.Entities.Common;
+using Domain.Entities.Common;
 using System.ComponentModel.DataAnnotations;
 
 namespace Domain.Entities
 {
     public class Product : BaseEntity, ITenantEntity
     {
+    public ICollection<ProductBatch> Batches { get; set; } = new List<ProductBatch>();
         public required string Name { get; set; }
         public string? Description { get; set; }
         public Guid? CategoryId { get; set; }

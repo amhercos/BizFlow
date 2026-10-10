@@ -1,4 +1,4 @@
-﻿using Application.Interfaces;
+using Application.Interfaces;
 using Domain.Entities;
 using Domain.Entities.Common;
 using Microsoft.EntityFrameworkCore;
@@ -26,6 +26,7 @@ public abstract class PosDbContext : DbContext, IPosDbContext
 
     public DbSet<Category> Categories => Set<Category>();
     public DbSet<Product> Products => Set<Product>();
+    public DbSet<ProductBatch> ProductBatches => Set<ProductBatch>();
     public DbSet<Transaction> Transactions => Set<Transaction>();
     public DbSet<TransactionItem> TransactionItems => Set<TransactionItem>();
     public DbSet<CustomerCredit> CustomerCredits => Set<CustomerCredit>();

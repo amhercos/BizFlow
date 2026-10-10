@@ -1,4 +1,4 @@
-﻿using Domain.Entities;
+using Domain.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 
@@ -8,6 +8,7 @@ public interface IPosDbContext
 {
     DbSet<Category> Categories { get; }
     DbSet<Product> Products { get; }
+    DbSet<ProductBatch> ProductBatches { get; }
     DbSet<Transaction> Transactions { get; }
     DbSet<TransactionItem> TransactionItems { get; }
     DbSet<CustomerCredit> CustomerCredits { get; }

@@ -196,6 +196,40 @@ namespace DbMigration.PostgreSQL.Migrations.PostgresPosDb
                     b.ToTable("Products", (string)null);
                 });
 
+            modelBuilder.Entity("Domain.Entities.ProductBatch", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateOnly>("ExpiryDate")
+                        .HasColumnType("date");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
+
+                    b.Property<Guid>("ProductId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Quantity")
+                        .HasColumnType("integer");
+
+                    b.Property<uint>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.Property<Guid>("StoreId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProductId");
+
+                    b.ToTable("ProductBatches", (string)null);
+                });
+
             modelBuilder.Entity("Domain.Entities.Promotion", b =>
                 {
                     b.Property<Guid>("Id")
@@ -448,6 +482,17 @@ namespace DbMigration.PostgreSQL.Migrations.PostgresPosDb
                     b.Navigation("Category");
                 });
 
+            modelBuilder.Entity("Domain.Entities.ProductBatch", b =>
+                {
+                    b.HasOne("Domain.Entities.Product", "Product")
+                        .WithMany("Batches")
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Product");
+                });
+
             modelBuilder.Entity("Domain.Entities.Promotion", b =>
                 {
                     b.HasOne("Domain.Entities.Product", "MainProduct")
@@ -518,6 +563,8 @@ namespace DbMigration.PostgreSQL.Migrations.PostgresPosDb
 
             modelBuilder.Entity("Domain.Entities.Product", b =>
                 {
+                    b.Navigation("Batches");
+
                     b.Navigation("Promotions");
                 });
 
