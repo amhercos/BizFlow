@@ -52,7 +52,7 @@ public class CreateProductHandler(
                 StoreId = storeId,
                 ProductId = productId,
                 Quantity = request.StockQuantity,
-                ExpiryDate = request.ExpiryDate ?? DateTime.UtcNow.AddYears(1), // Default to 1 year if unspec
+                ExpiryDate = request.ExpiryDate ?? DateOnly.FromDateTime(DateTime.UtcNow.AddYears(1)), // Default to 1 year if unspec
                 IsDeleted = false
             };
             await productRepository.AddBatchAsync(initialBatch, ct);
