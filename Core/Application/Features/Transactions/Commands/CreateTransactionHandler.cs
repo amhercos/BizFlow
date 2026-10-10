@@ -89,7 +89,7 @@ public class CreateTransactionHandler(
                         context.ProductBatches.Update(batch);
                     }
 
-                    product.Stock = activeBatches.Sum(b => b.Quantity);
+                    product.Stock = Math.Max(0, product.Stock - basePiecesDeducted);
                 }
                 // ----------------------------------
 
@@ -142,7 +142,7 @@ public class CreateTransactionHandler(
             else
             {
                 if (transaction.CashReceived < transaction.TotalAmount)
-                    throw new Exception($"Insufficient cash. Required: ₱{transaction.TotalAmount:N2}, Received: ₱{transaction.CashReceived:N2}");
+                    throw new Exception($"Insufficient cash. Required: â‚±{transaction.TotalAmount:N2}, Received: â‚±{transaction.CashReceived:N2}");
 
                 transaction.ChangeAmount = transaction.CashReceived - transaction.TotalAmount;
             }
