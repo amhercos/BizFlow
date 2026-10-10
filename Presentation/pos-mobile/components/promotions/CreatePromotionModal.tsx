@@ -1,7 +1,7 @@
 import { typeface, useInter } from "@/src/theme/typography";
 import type { Product } from "@/src/types/inventory";
 import { Check, Search, Trash2, X } from "lucide-react-native";
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -69,7 +69,12 @@ export default function CreatePromotionModal({
   const insets = useSafeAreaInsets();
   const font = useInter();
   const { addPromotion, isProcessing } = usePromotions();
-  const { products } = useInventory();
+  const { products, refresh: refreshProducts } = useInventory();
+
+  useEffect(() => {
+    if (isVisible) void refreshProducts?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isVisible]);
 
   const [type, setType] = useState<PromotionType>(PromotionType.Discount);
   const [name, setName] = useState("");
@@ -156,7 +161,7 @@ export default function CreatePromotionModal({
         ?.filter((item) =>
           item.name.toLowerCase().includes(productSearch.toLowerCase()),
         )
-        .slice(0, 6) ?? [],
+        .slice(0, 20) ?? [],
     [products, productSearch],
   );
 
@@ -166,7 +171,7 @@ export default function CreatePromotionModal({
         ?.filter((item) =>
           item.name.toLowerCase().includes(tieUpSearch.toLowerCase()),
         )
-        .slice(0, 6) ?? [],
+        .slice(0, 20) ?? [],
     [products, tieUpSearch],
   );
 

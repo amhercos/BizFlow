@@ -22,6 +22,7 @@ import EditPromotionModal from "../../components/promotions/EditPromotionModal";
 import EmptyPromotions from "../../components/promotions/EmptyPromotions";
 import PromotionCard from "../../components/promotions/PromotionCard";
 import PromotionCardSkeleton from "../../components/promotions/PromotionCardSkeleton";
+import { useInventory } from "../../src/hooks/use-inventory";
 import { usePromotions } from "../../src/hooks/use-promotions";
 import { Promotion } from "../../src/types/promotion";
 
@@ -44,6 +45,25 @@ export default function PromotionsScreen() {
   const font = useInter();
   const { promotions, isLoading, refresh, togglePromotion, removePromotion } =
     usePromotions();
+
+  const { refresh: refreshProducts } = useInventory();
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [createSession, setCreateSession] = useState(0);
+  const openCreate = () => {
+    setCreateSession((n) => n + 1);
+    setIsCreateModalOpen(true);
+  };
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      await Promise.all([
+        Promise.resolve(refresh()),
+        Promise.resolve(refreshProducts?.()),
+      ]);
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
 
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedStrategy, setSelectedStrategy] =
@@ -124,7 +144,7 @@ export default function PromotionsScreen() {
     return (
       <PromotionCard
         promotion={item}
-        onToggle={(id) => togglePromotion(id)}
+        onToggle={() => togglePromotion(item.mainProductId)}
         onDelete={(id) => setPromotionToDelete(id)}
         onEdit={() => setEditingPromotion(item)}
       />
@@ -144,7 +164,7 @@ export default function PromotionsScreen() {
           </Text>
         </View>
         <TouchableOpacity
-          onPress={() => setIsCreateModalOpen(true)}
+          onPress={() => openCreate()}
           style={styles.headerAdd}
           accessibilityLabel="Add promotion"
         >
@@ -261,17 +281,19 @@ export default function PromotionsScreen() {
         renderItem={renderItem}
         ListEmptyComponent={!isLoading ? <EmptyPromotions /> : null}
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.listContent}
+        contentContainerStyle={[styles.listContent, { flexGrow: 1 }]}
+        alwaysBounceVertical
         refreshControl={
           <RefreshControl
-            refreshing={isLoading && (promotions?.length ?? 0) > 0}
-            onRefresh={refresh}
+            refreshing={isRefreshing}
+            onRefresh={handleRefresh}
             tintColor={TINT}
           />
         }
       />
 
       <CreatePromotionModal
+        key={createSession}
         isVisible={isCreateModalOpen}
         onClose={() => setIsCreateModalOpen(false)}
       />
